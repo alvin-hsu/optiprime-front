@@ -1,25 +1,48 @@
-import logo from './logo.svg';
-import './App.css';
+import React from "react";
+import { SwitchTransition, CSSTransition } from 'react-transition-group';
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
+
+import About from "./About"
+import Design from "./Design"
+import Header from "./Header"
+import Home from "./Home"
+import OtherLinks from "./Other";
+import REST from "./REST"
+
+import "./App.css"
+import "./Animations.css"
 
 function App() {
+  const location = useLocation();
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
+    <div className="flex-container">
+      <Header />
+      <div className="main-content">
+        <SwitchTransition mode="out-in">
+        <CSSTransition
+          key={location.pathname}
+          timeout={300} // Duration of your animation
+          classNames="slide" // Prefix for the CSS transition classes
         >
-          Learn React
-        </a>
-      </header>
+          <Routes location={location}>
+            <Route exact path="/" element={<Home />} />
+            <Route path="/rest" element={<REST />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/other" element={<OtherLinks />}/>
+            <Route path="/design" element={<Design />} />
+          </Routes>
+        </CSSTransition>
+      </SwitchTransition>
+      </div>
     </div>
   );
 }
 
-export default App;
+export default function AppWrapper() {
+  return (
+    <Router>
+      <App />
+    </Router>
+  );
+}
