@@ -57,3 +57,20 @@ export const coordsToRefSequence = (coords, contextLen) => {
                 return data["dna"];
             });
 }
+
+export const coordsToRefSeq = (coords) => {
+    const query = ("genome=" + coords.assembly + ";" +
+                   "chrom=" + coords.chrom + ";" +
+                   "start=" + String(coords.pos) + ";" +
+                   "end=" + String(coords.pos) + ';' +
+                   "track=ncbiRefSeq")
+    return fetch("https://api.genome.ucsc.edu/getData/track?" + query)
+            .then(resp => {
+                if (!resp.ok) {
+                    throw new Error("Failed to get RefSeq annotations from UCSC")
+                }
+                return resp.json();})
+            .then(data => {
+                return data['ncbiRefSeq'][0];
+            });
+}
