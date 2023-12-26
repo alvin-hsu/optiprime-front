@@ -179,8 +179,8 @@ function Step3({ data, handleStep, setData }) {
         if (refSeq) {
             const newAnnotations = {
                 name: data.rsID,
-                start: data.coords.pos,
-                end: data.coords.pos,
+                start: contextLen,
+                end: contextLen+1,
                 direction: refSeq.strand === "+" ? 1 : -1,
                 color: "blue",
             };
@@ -190,7 +190,7 @@ function Step3({ data, handleStep, setData }) {
                 name: data.rsID,
                 start: contextLen, // highlight the relevant mutation 
                 end: contextLen+1,
-                direction: 1,
+                direction: 1,   // Guessing +, might be wrong 
                 color: "blue",
             };
             setAnnotations([newAnnotations]);
