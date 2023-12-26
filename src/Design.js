@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSpring, animated } from "react-spring";
-import { rsIDtoHg38Coords, coordsToRefSequence } from "./Utils"
+import { rsIDtoHg38Coords, fetchSequenceFromCoords, coordsToRefSeq, isIntronOrExon} from "./Utils"
 
 const Prompt = ({ text }) => {
     return (
@@ -95,21 +95,146 @@ const Step2 = ({data, handleStep, setData}) => {
     );
 }
 
-function Step3({data, handleStep, setData}) {
-    console.log(data);
-    return <div>Step3</div>
+
+/* Step 3 - Fetch DNA sequence from rsID
+ *
+ * Output: 
+ * - Unedited DNA sequence around the target edit site
+ *  
+ * The user has provided us with an rsID for an edit. 
+ * {
+ *   "rsID": "rs6511720",
+ *   "coords": {
+ *     "assembly": "hg38",
+ *     "chrom": "chr19",
+ *     "pos": "11091629",
+ *     "gene": "LDLR",
+ *     "alleles": "G/T",
+ *     "mode": "install"
+ *   }
+ * } 
+ * 
+ * We have coordinates and need to fetch the corresponding exon. We'll add some buffer before 
+ * and after so we can screen for usable PAMs, Silent edits, etc. 
+ * 
+ * We might also be editing within introns. If that's the case, we cannot introduce silent edits.
+ * 
+ * 
+ * NOTE: 
+ * ~~If the edit is right at the start or end of an exon, we might need to fetch the previous/next
+ * exon as well since there might be usable PAMs after RNA splicing.~~ Dumb, we're operating at DNA not RNA level
+ * 
+ * 
+ * Question: 
+ * How much context is reasonable? -> +-100bp around the coords
+ * Avoid ones with long poly-T sequences but ML probably handles that -> Yes it does
+ * 
+ * 
+ * Testing rsIDs:
+ * - rs993122941 -> exon, 1
+ * - rs6511720   -> intron, 1
+ * 
+ * 
+ */
+function Step3({ data, handleStep, setData }) {
+    const [sequence, setSequence] = useState('');
+    const [refSeq, setRefSeq] = useState(null);
+    const [position, setPosition] = useState('');
+
+    useEffect(() => {
+        // Fetch sequence
+        fetchSequenceFromCoords(data.coords, 10)
+            .then(seq => {
+                console.log("Seq from coords:" + seq);
+                setSequence(seq); 
+            })
+            .catch(error => {
+                console.error("Error fetching seq:", error);
+            });
+
+        // Fetch reference and determine position
+        coordsToRefSeq(data.coords)
+            .then(refSeq => {
+                console.log("Reference: " + refSeq);
+                
+                window.refSeq = refSeq; // for debugging
+                
+                setRefSeq(refSeq);
+                const pos = isIntronOrExon(data.coords.pos, refSeq);
+                console.log(pos);
+                setPosition(pos);
+            })
+            .catch(error => {
+                console.error("Error fetching refSeq:", error);
+            });
+    }, [data.coords]); // Only rerun the effect if data.coords changes
+
+    return (
+    <>
+        <div>
+            Step3<br/>
+            Position: {position && `${position[0]}, ${position[1]}`}<br/>
+            Sequence: {sequence}<br/>
+        </div>
+    </>
+);
 }
 
+/* Step 4 - Prepare unedited sequence
+ * 
+ * Output: 
+ * - Final sequence to be edited with N(50?)bp context.
+ * 
+ * We now have access to the unedited DNA sequence (either because the user directly provided it or 
+ * we fetched it from the corresponding rsID). Since this isn't necessarily the exact sequence targeted,
+ * we'll use benchling's SeqViz to display the original sequence +-50bp and let the user make changes to match the actual 
+ * DNA they're dealing with. 
+ * 
+ * If exon -> Display AA as well.
+ * 
+ */ 
 function Step4({data, handleStep, setData}) {
     console.log(data);
     return <div>Step4</div>
 }
 
+/* Step 5 - Prepare edited sequence
+ * 
+ * Output:
+ * - Target edit
+ * - Possible PAMs
+ * - Possible silent edits
+ * - (possible nickinging sgRNAs on opposite strand?)
+ * - (possible PAMs for PE3B strategy if available?)
+ * 
+ * This is where we make the actual change. If we were provided with an rsID specifying a change to install,
+ * we can prefil the desired change, otherwise we can just display the unedited sequence and let the
+ * user make whatever changes they'd like.
+ * 
+ * Note:
+ * It doesn't matter if the rsID specifies a change to install or not. It matters if the user would 
+ * like use it as source or dest. (Always treat as install and allow easy toggle). 
+ * 
+ * Processing: 
+ * This is where we get into some PE logic. We need a suitable PAM, within +~50 bases of our edit on either strand.
+ * The model resposible for processing will figure out which one is best, but we need to fetch all suitable candidates.
+ * In order to make editing more efficient, we'll also want to create a map of all possible silent edits we can make 
+ * that would result in the same ammino acid, leaving the final protein unchanged. Note that you can't have silent edits
+ * if you're not in an exon. 
+ * 
+ */ 
 function Step5({data, handleStep, setData}) {
     console.log(data);
     return <div>Step5</div>
 }
 
+
+/* Step 6 - Talk to the model
+ * 
+ * Pass the information to the model for processing, fetch the result and tell the user what 
+ * the best edits are.
+ * 
+ */
 function Step6({data, handleStep, setData}) {
     console.log(data);
     return <div>Step6</div>
@@ -147,7 +272,7 @@ export default function Design() {
             from: { opacity: 0, transform: 'translate3d(100%,0,0)' },
             to: { opacity: 1, transform: 'translate3d(0%,0,0)' }
         })
-    }
+    } 
 
     const handleBack = () => {
         setStep(stack[stack.length - 1]);
