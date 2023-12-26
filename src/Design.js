@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useSpring, animated } from "react-spring";
 import { rsIDtoHg38Coords, fetchSequenceFromCoords, coordsToRefSeq, isIntronOrExon} from "./Utils"
+import { SeqViz } from "seqviz";
+
 
 const Prompt = ({ text }) => {
     return (
@@ -140,10 +142,13 @@ function Step3({ data, handleStep, setData }) {
     const [sequence, setSequence] = useState('');
     const [refSeq, setRefSeq] = useState(null);
     const [position, setPosition] = useState('');
+    const [annotations, setAnnotations] = useState([]);
+
+    let contextLen = 10
 
     useEffect(() => {
         // Fetch sequence
-        fetchSequenceFromCoords(data.coords, 10)
+        fetchSequenceFromCoords(data.coords, contextLen)
             .then(seq => {
                 console.log("Seq from coords:" + seq);
                 setSequence(seq); 
@@ -155,7 +160,7 @@ function Step3({ data, handleStep, setData }) {
         // Fetch reference and determine position
         coordsToRefSeq(data.coords)
             .then(refSeq => {
-                console.log("Reference: " + refSeq);
+                console.log(refSeq);
                 
                 window.refSeq = refSeq; // for debugging
                 
@@ -167,14 +172,43 @@ function Step3({ data, handleStep, setData }) {
             .catch(error => {
                 console.error("Error fetching refSeq:", error);
             });
-    }, [data.coords]); // Only rerun the effect if data.coords changes
+    }, [data.coords, contextLen]); // Only rerun the effect if data.coords changes
+
+    useEffect(() => {
+        if (refSeq) {
+            const newAnnotations = {
+                name: data.rsID,
+                start: data.coords.pos,
+                end: data.coords.pos,
+                direction: refSeq.strand === "+" ? 1 : -1,
+                color: "blue",
+            };
+            setAnnotations([newAnnotations]);
+        } else {
+            const newAnnotations = {
+                name: data.rsID,
+                start: contextLen, // highlight the relevant mutation 
+                end: contextLen+1,
+                direction: 1,
+                color: "blue",
+            };
+            setAnnotations([newAnnotations]);
+        }
+    }, [refSeq, data.coords.pos, contextLen]);
 
     return (
-    <>
-        <div>
+        <>
+        <div style={{ width: '100%' }}>
             Step3<br/>
             Position: {position && `${position[0]}, ${position[1]}`}<br/>
-            Sequence: {sequence}<br/>
+            <div style={{ height: '500px', width: '100%', position: 'relative', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                <SeqViz
+                    name="Custom Sequence"
+                    seq={sequence}
+                    viewer="linear"
+                    annotations={annotations}
+                />
+            </div>
         </div>
     </>
 );
@@ -265,6 +299,12 @@ export default function Design() {
         to: { opacity: 1, transform: 'translate3d(0%,0,0)' },
     }));
 
+    // const [transition, api] = useSpring(() => ({
+    //     from: { opacity: 0 },
+    //     to: { opacity: 1 },
+    // }));
+    
+
     const handleStep = (currStep, nextStep) => {
         setStep(nextStep);
         setStack(oldStack => [...oldStack, currStep]);
@@ -308,9 +348,9 @@ export default function Design() {
     };
 
     return (
-    <animated.div style={transition}>
-        {renderStep()}
-        <BackButton step={step} handleBack={handleBack} />
-    </animated.div>
-  );
+        <animated.div style={{ ...transition, minHeight: '500px', width: '100%' }}>
+            {renderStep()}
+            <BackButton step={step} handleBack={handleBack} />
+        </animated.div>
+    );
 }
