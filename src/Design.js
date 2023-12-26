@@ -143,6 +143,7 @@ function Step3({ data, handleStep, setData }) {
     const [refSeq, setRefSeq] = useState(null);
     const [position, setPosition] = useState('');
     const [annotations, setAnnotations] = useState([]);
+    const [translations, setTranslations] = useState([]);
 
     let contextLen = 10
 
@@ -196,8 +197,36 @@ function Step3({ data, handleStep, setData }) {
         }
     }, [refSeq, data.coords.pos, contextLen]);
 
+    useEffect(() => {
+        if(position[0] == "exon") {
+            // We need to calculate the frame of our context based on the exon frame
+            let exonStart = position[2]
+            let exonFrame = position[3]
+            let center = data.coords.pos
+
+            // We need to find the distance between the exon start and 
+            // the context start to calculate the contextFrame
+            let exonToContext = (center-contextLen) - exonStart
+            let contextFrame = (exonStart+exonToContext+exonFrame) % 3
+
+            let contextFrameEnd = (contextLen*2) - (((contextLen*2) - contextFrame) % 3)
+            // TODO: Handle if context starts before/ends after exon
+
+            console.log(`EXON - exonStart:${exonStart}, exonFrame:${exonFrame}, exonToContext:${exonToContext}, center:${center}, contextFrame:${contextFrame}, contextFrameEnd:${contextFrameEnd}`)
+
+            const newTranslations = {
+                name: data.rsID,
+                start: contextFrame, 
+                end: contextFrameEnd,
+                direction: 1, // FWD
+            };
+
+            setTranslations([newTranslations])
+        }
+    }, [position, data.coords.pos, contextLen]);
+
     return (
-        <>
+    <>
         <div style={{ width: '100%' }}>
             Step3<br/>
             Position: {position && `${position[0]}, ${position[1]}`}<br/>
@@ -207,6 +236,7 @@ function Step3({ data, handleStep, setData }) {
                     seq={sequence}
                     viewer="linear"
                     annotations={annotations}
+                    translations={translations}
                 />
             </div>
         </div>

@@ -92,11 +92,14 @@ export const isIntronOrExon = (index, geneData) => {
 
     const exonStarts = geneData.exonStarts.split(',').map(Number).filter(n => !isNaN(n));
     const exonEnds = geneData.exonEnds.split(',').map(Number).filter(n => !isNaN(n));
+    const exonFrames =  geneData.exonFrames.split(',').map(Number).filter(n => !isNaN(n));
 
     // are we in any of the exons?
     for (let i = 0; i < exonStarts.length; i++) {
         if (index >= exonStarts[i] && index <= exonEnds[i]) {
-            return ["exon", i+1];
+
+            // it's an exon! Which one, where does it start and what's the frame?
+            return ["exon", i+1, exonStarts[i], exonFrames[i]];
         }
     }
 
