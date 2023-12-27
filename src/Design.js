@@ -207,7 +207,7 @@ function Step3({ data, handleStep, setData }) {
             // We need to find the distance between the exon start and 
             // the context start to calculate the contextFrame
             let exonToContext = (center-contextLen) - exonStart
-            let contextFrame = (exonStart+exonToContext+exonFrame) % 3
+            let contextFrame = exonFrame + (exonToContext % 3)
 
             let contextFrameEnd = (contextLen*2) - (((contextLen*2) - contextFrame) % 3)
             // TODO: Handle if context starts before/ends after exon
@@ -218,7 +218,7 @@ function Step3({ data, handleStep, setData }) {
                 name: data.rsID,
                 start: contextFrame, 
                 end: contextFrameEnd,
-                direction: 1, // FWD
+                direction: data.strand == "+" ? 1 : -1,
             };
 
             setTranslations([newTranslations])
