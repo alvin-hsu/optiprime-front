@@ -133,10 +133,10 @@ const Step2 = ({data, handleStep, setData}) => {
  * 
  * 
  * Testing rsIDs:
- * - rs993122941 -> exon, 1
+ * - rs993122941 -> exon (3' UTR), 1
  * - rs6511720   -> intron, 1
- * 
- * 
+ * - rs782665893 -> exon (CDS), C>T (DNA) V>M (protein). Gene goes in - strand
+ * - rs113993960 -> exon (CDS), TCTT>T (or delTCT or delCTT) (DNA), del F (protein). Gene goes in + strand
  */
 function Step3({ data, handleStep, setData }) {
     const [sequence, setSequence] = useState('');
