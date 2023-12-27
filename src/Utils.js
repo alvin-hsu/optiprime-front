@@ -32,6 +32,10 @@ export const coordsToRefSeq = (coords) => {
                    "start=" + String(coords.pos) + ";" +
                    "end=" + String(parseInt(coords.pos)+1) + ';' +
                    "track=ncbiRefSeq")
+    
+    // TODO: Convert Query to URL() onject
+    // TODO: Handle 500 on track endpoint 
+
     return fetch("https://api.genome.ucsc.edu/getData/track?" + query)
             .then(resp => {
                 if (!resp.ok) {
@@ -75,7 +79,7 @@ export const fetchSequenceFromCoords = async (coords, contextLen) => {
       console.error('Failed to fetch sequence from UCSC:', error);
       return null;
     }
-  };
+};
 
 // ****************************** COMPUTATION ******************************
 /* 

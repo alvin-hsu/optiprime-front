@@ -180,7 +180,7 @@ function Step3({ data, handleStep, setData }) {
             const newAnnotations = {
                 name: data.rsID,
                 start: contextLen,
-                end: contextLen+1,
+                end: contextLen+1, // TODO: What if it's not a point mutation? (insertion/deletion)
                 direction: refSeq.strand === "+" ? 1 : -1,
                 color: "blue",
             };
