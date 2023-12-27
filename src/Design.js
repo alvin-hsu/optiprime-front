@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useSpring, animated } from "react-spring";
 import { rsIDtoHg38Coords, fetchSequenceFromCoords, coordsToRefSeq, isIntronOrExon} from "./Utils"
-import { SeqViz } from "seqviz";
+import { SeqViz, SelectionHandler } from "seqviz";
+import Popup from 'reactjs-popup';
 
 
 const Prompt = ({ text }) => {
@@ -225,21 +226,67 @@ function Step3({ data, handleStep, setData }) {
         }
     }, [position, data.coords.pos, contextLen]);
 
+    const [isPopupOpen, setIsPopupOpen] = useState(false);
+    const [editSequence, setEditSequence] = useState('');
+    const [selectionRange, setSelectionRange] = useState({ start: 0, end: 0 });
+
+    const handleOpenPopup = () => {
+        setIsPopupOpen(true);
+    };
+
+    const handleClosePopup = () => {
+        setIsPopupOpen(false);
+    };
+
+    const handleEditSubmit = () => {
+        if (selectionRange.start !== selectionRange.end) {
+            // Replace the selected sequence
+            const newSequence = sequence.substring(0, selectionRange.start) +
+                                editSequence +
+                                sequence.substring(selectionRange.end);
+            setSequence(newSequence);
+        } else {
+            // Insert at the cursor position
+            const newSequence = sequence.substring(0, selectionRange.start) +
+                                editSequence +
+                                sequence.substring(selectionRange.start);
+            setSequence(newSequence);
+        }
+        handleClosePopup();
+    };
+
+    const handleSequenceChange = (selection) => {
+        setSelectionRange({ start: selection.start, end: selection.end });
+    };
+
     return (
-    <>
-        <div style={{ width: '100%' }}>
-            Step3<br/>
-            Position: {position && `${position[0]}, ${position[1]}`}<br/>
-            <div style={{ height: '500px', width: '100%', position: 'relative', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-                <SeqViz
-                    name="Custom Sequence"
-                    seq={sequence}
-                    viewer="linear"
-                    annotations={annotations}
-                    translations={translations}
-                />
+        <>
+            <div style={{ width: '100%' }}>
+                Step3<br/>
+                Position: {position && `${position[0]}, ${position[1]}`}<br/>
+                <div style={{ height: '500px', width: '100%', position: 'relative', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                    <SeqViz
+                        name="Custom Sequence"
+                        seq={sequence}
+                        viewer="linear"
+                        annotations={annotations}
+                        translations={translations}
+                        onSelection={handleSequenceChange}
+                    />
+                </div>
             </div>
-        </div>
+            <div>
+                <button onClick={handleOpenPopup}>Edit</button>
+            </div>
+
+            <Popup open={isPopupOpen} closeOnEscape onClose={handleClosePopup}>
+                <div>
+                    <input type="text" value={editSequence} onChange={e => setEditSequence(e.target.value)} />
+                    <button onClick={handleEditSubmit}>Submit</button>
+                    <button onClick={handleClosePopup}>Cancel</button>
+                </div>
+            </Popup>
+
     </>
 );
 }
