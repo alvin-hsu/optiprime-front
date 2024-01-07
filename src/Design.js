@@ -222,13 +222,22 @@ function Step3({ data, handleStep, setData }) {
             setAnnotations(prevAnnotations => [...prevAnnotations, ...exonAnnotations]);
                 
             const contextTranslations = contextExons.map(exon => {
-                let translationStart = exon.startOffset + exon.frame; // Adjust for the frame
-                let translationEnd = exon.endOffset;
-            
+                let adjFrame, translationEnd, translationStart
+                if (refSeq.strand === '+') {
+                    adjFrame = (3 - exon.frame) % 3;  // Huge shoutout to NCBI for making this weird
+                    translationStart = exon.startOffset + adjFrame; // Adjust for the frame
+                    translationEnd = exon.endOffset;
+                } else {
+                    let exonLen = exon.endOffset - exon.startOffset;
+                    adjFrame = (exonLen + exon.frame) % 3;  // Huge shoutout to NCBI for making this weird AND inconsistent
+                    translationStart = exon.startOffset + adjFrame;  // Bonus shoutout to seqViz for translation
+                    translationEnd = exon.endOffset;
+                }
+
                 return {
                     start: translationStart,
                     end: translationEnd,
-                    direction: data.strand == "+" ? 1 : -1,
+                    direction: refSeq.strand === "+" ? 1 : -1,
                 };
             });
 

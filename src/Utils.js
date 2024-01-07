@@ -140,7 +140,7 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
     console.log("Context Start:", contextStart);
     console.log("Context End:", contextEnd);
     console.log("Context Len:", contextLen);
-    console.log("Tartet:", target);
+    console.log("Target:", target);
 
     for (let i = 0; i < exonStarts.length; i++) {
         
@@ -154,11 +154,16 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
             // Clip to start/end in case of partial overlap
             const startOffset = Math.max(0, exonStarts[i] - contextStart);
             const endOffset = Math.min(exonEnds[i], contextEnd) - contextStart;
-    
-            // If the exon starts before the context we gotta adjust the frame
+
+            // If the exon starts outside the context we gotta adjust the frame
             let adjustedFrame = exonFrames[i];
-            if (exonStarts[i] < contextStart) {
+            if (exonStarts[i] < contextStart && geneData.strand === '+') {
                 const distanceFromContextStart = contextStart - exonStarts[i];
+                adjustedFrame = (exonFrames[i] + distanceFromContextStart) % 3;
+            }
+            if (exonEnds[i] > contextEnd && geneData.strand === '-') {
+                const distanceFromContextStart = exonEnds[i] - contextEnd;
+                console.log(distanceFromContextStart);
                 adjustedFrame = (exonFrames[i] + distanceFromContextStart) % 3;
             }
     
