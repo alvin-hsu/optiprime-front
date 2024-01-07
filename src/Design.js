@@ -186,10 +186,11 @@ function Step3({ data, handleStep, setData }) {
     // ---------------------------- HIGHLIGHT MUTATION
     useEffect(() => {
         if (refSeq) {
+            const uneditedLen = data.coords.alleles.split('/')[0].length;
             const newAnnotations = {
                 name: data.rsID,
                 start: contextLen,
-                end: contextLen+1, // TODO: What if it's not a point mutation? (insertion/deletion)
+                end: contextLen + uneditedLen,
                 direction: refSeq.strand === "+" ? 1 : -1,
                 color: "blue",
             };
