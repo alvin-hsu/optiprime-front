@@ -302,20 +302,6 @@ function Step3({ data, handleStep, setData }) {
         handleStep(3, 4)
     }
 
-    // // update global state 
-    // useEffect(() => {
-    //     console.log("updating unedited data...");
-    //     setData(prevData => ({
-    //         ...prevData, 
-    //         unedited: {
-    //             sequence: sequence,
-    //             translations: translations,
-    //             annotations: annotations, 
-    //             contextLen: contextLen,
-    //         }
-    //     }));
-    // }, [sequence, translations, annotations, contextLen])
-
     const handleSequenceChange = (selection) => {
         setSelectionRange({ start: selection.start, end: selection.end });
     };
@@ -481,8 +467,8 @@ function Step4({data, handleStep, setData}) {
                 </form>
             </Popup>
         </>
-    );}
-
+    );
+}
 
 function Step5({data, handleStep, setData}) {
     console.log("Step 5", data);
