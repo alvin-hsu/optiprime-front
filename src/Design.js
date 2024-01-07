@@ -152,7 +152,7 @@ function Step3({ data, handleStep, setData }) {
     const [annotations, setAnnotations] = useState([]);
     const [translations, setTranslations] = useState([]);
 
-    let contextLen = 400
+    let contextLen = 300
 
     // ---------------------------- GET SEQ
     useEffect(() => {
@@ -251,7 +251,7 @@ function Step3({ data, handleStep, setData }) {
             setTranslations(contextTranslations)
     
         } else {
-            console.log("geneData is null");
+            console.log("refSeq is null");
         }
 
     }, [position, refSeq, data.coords.pos, contextLen]);
@@ -269,7 +269,9 @@ function Step3({ data, handleStep, setData }) {
         setIsPopupOpen(false);
     };
 
-    const handleEditSubmit = () => {
+    const handleEditSubmit = (event) => {
+        event.preventDefault(); // Prevent the default form submission from breaking the code flow
+
         if (selectionRange.start !== selectionRange.end) {
             // Replace the selected sequence
             const newSequence = sequence.substring(0, selectionRange.start) +
@@ -309,13 +311,15 @@ function Step3({ data, handleStep, setData }) {
             <div>
                 <button onClick={handleOpenPopup}>Edit</button>
             </div>
-
             <Popup open={isPopupOpen} closeOnEscape onClose={handleClosePopup}>
-                <div>
-                    <input type="text" value={editSequence} onChange={e => setEditSequence(e.target.value)} />
-                    <button onClick={handleEditSubmit}>Submit</button>
-                    <button onClick={handleClosePopup}>Cancel</button>
-                </div>
+                {/* This is a form so you can confirm by just pressing enter */}
+                <form onSubmit={handleEditSubmit}>
+                    <div>
+                        <input type="text" value={editSequence} onChange={e => setEditSequence(e.target.value)} />
+                        <button type="submit">Submit</button>
+                        <button type="button" onClick={handleClosePopup}>Cancel</button>
+                    </div>
+                </form>
             </Popup>
         </>
     );
