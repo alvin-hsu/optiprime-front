@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useSpring, animated } from "react-spring";
-import { rsIDtoHg38Coords, fetchSequenceFromCoords, coordsToRefSeq, isIntronOrExon} from "./Utils"
+import { rsIDtoHg38Coords, fetchSequenceFromCoords, coordsToRefSeq, isIntronOrExon, getContextExonTranslations} from "./Utils"
 import { SeqViz, SelectionHandler } from "seqviz";
 import Popup from 'reactjs-popup';
 
@@ -93,7 +93,13 @@ const Step2 = ({data, handleStep, setData}) => {
                     </option>
                 ))}
             </select>
-            {inputVisible && <input value={chrCoords} onChange={handleInputChange}></input>}
+            {inputVisible && (
+            <input
+                value={chrCoords}
+                onChange={handleInputChange}
+                placeholder="chrom:pos"
+            />
+        )}
         </div>
     );
 }
@@ -146,8 +152,9 @@ function Step3({ data, handleStep, setData }) {
     const [annotations, setAnnotations] = useState([]);
     const [translations, setTranslations] = useState([]);
 
-    let contextLen = 10
+    let contextLen = 50
 
+    // ---------------------------- GET SEQ
     useEffect(() => {
         // Fetch sequence
         fetchSequenceFromCoords(data.coords, contextLen)
@@ -176,6 +183,7 @@ function Step3({ data, handleStep, setData }) {
             });
     }, [data.coords, contextLen]); // Only rerun the effect if data.coords changes
 
+    // ---------------------------- HIGHLIGHT MUTATION
     useEffect(() => {
         if (refSeq) {
             const newAnnotations = {
@@ -198,34 +206,43 @@ function Step3({ data, handleStep, setData }) {
         }
     }, [refSeq, data.coords.pos, contextLen]);
 
+    // ---------------------------- LABEL EXONS
     useEffect(() => {
-        if(position[0] == "exon") {
-            // We need to calculate the frame of our context based on the exon frame
-            let exonStart = position[2]
-            let exonFrame = position[3]
-            let center = data.coords.pos
+        if (refSeq) {
+            const {contextExons}  = getContextExonTranslations(refSeq, data.coords.pos, contextLen);
+            // Use contextExons and contextFrame as needed
+            const annotations = contextExons.map(exon => ({
+                name: `Exon ${exon.exonNumber}`, // Naming each exon
+                start: exon.startOffset, 
+                end: exon.endOffset,
+                direction: refSeq.strand === "+" ? 1 : -1, // Assuming refSeq is available
+                color: "orange", // You can choose a color coding scheme
+            }));
+    
+            setAnnotations(annotations);
+                
+            const contextTranslations = contextExons.map(exon => {
+                let translationStart = exon.startOffset + exon.frame; // Adjust for the frame
+                let translationEnd = exon.endOffset;
+            
+                return {
+                    start: translationStart,
+                    end: translationEnd,
+                    direction: data.strand == "+" ? 1 : -1,
+                };
+            });
 
-            // We need to find the distance between the exon start and 
-            // the context start to calculate the contextFrame
-            let exonToContext = (center-contextLen) - exonStart
-            let contextFrame = exonFrame + (exonToContext % 3)
+            console.log("Translations:", contextTranslations);
 
-            let contextFrameEnd = (contextLen*2) - (((contextLen*2) - contextFrame) % 3)
-            // TODO: Handle if context starts before/ends after exon
-
-            console.log(`EXON - exonStart:${exonStart}, exonFrame:${exonFrame}, exonToContext:${exonToContext}, center:${center}, contextFrame:${contextFrame}, contextFrameEnd:${contextFrameEnd}`)
-
-            const newTranslations = {
-                name: data.rsID,
-                start: contextFrame, 
-                end: contextFrameEnd,
-                direction: data.strand == "+" ? 1 : -1,
-            };
-
-            setTranslations([newTranslations])
+            setTranslations(contextTranslations)
+    
+        } else {
+            console.log("geneData is null");
         }
-    }, [position, data.coords.pos, contextLen]);
 
+    }, [position, refSeq, data.coords.pos, contextLen]);
+
+    // ---------------------------- EDIT POPUP
     const [isPopupOpen, setIsPopupOpen] = useState(false);
     const [editSequence, setEditSequence] = useState('');
     const [selectionRange, setSelectionRange] = useState({ start: 0, end: 0 });
@@ -286,9 +303,8 @@ function Step3({ data, handleStep, setData }) {
                     <button onClick={handleClosePopup}>Cancel</button>
                 </div>
             </Popup>
-
-    </>
-);
+        </>
+    );
 }
 
 /* Step 4 - Prepare unedited sequence
@@ -376,11 +392,6 @@ export default function Design() {
         to: { opacity: 1, transform: 'translate3d(0%,0,0)' },
     }));
 
-    // const [transition, api] = useSpring(() => ({
-    //     from: { opacity: 0 },
-    //     to: { opacity: 1 },
-    // }));
-    
 
     const handleStep = (currStep, nextStep) => {
         setStep(nextStep);

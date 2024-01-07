@@ -121,3 +121,58 @@ export const isIntronOrExon = (index, geneData) => {
 
     return ["huh?", -1]; // Default return if not caught by above cases
 }
+
+
+/* 
+ * Figure out the starts and ends of Exons in a specific context window
+ * using ncbiRefSeq objects from https://api.genome.ucsc.edu/getData/track
+ * 
+ */
+export const getContextExonTranslations = (geneData, target, contextLen) => {
+    const contextStart = Number(target) - Number(contextLen);
+    const contextEnd = Number(target) + Number(contextLen);
+    
+    const exonStarts = geneData.exonStarts.split(',').map(Number).filter(n => !isNaN(n));
+    const exonEnds = geneData.exonEnds.split(',').map(Number).filter(n => !isNaN(n));
+    const exonFrames = geneData.exonFrames.split(',').map(Number).filter(n => !isNaN(n));
+
+    let contextExons = [];
+    console.log("Context Start:", contextStart);
+    console.log("Context End:", contextEnd);
+    console.log("Context Len:", contextLen);
+    console.log("Tartet:", target);
+
+    for (let i = 0; i < exonStarts.length; i++) {
+        
+        // Check handles all four cases:
+        // - Start before end after
+        // - Start before end within
+        // - Start within end after
+        // - Start within end within
+        if (exonStarts[i] <= contextEnd && exonEnds[i] >= contextStart) {
+            
+            // Clip to start/end in case of partial overlap
+            const startOffset = Math.max(0, exonStarts[i] - contextStart);
+            const endOffset = Math.min(exonEnds[i], contextEnd) - contextStart;
+    
+            // If the exon starts before the context we gotta adjust the frame
+            let adjustedFrame = exonFrames[i];
+            if (exonStarts[i] < contextStart) {
+                const distanceFromContextStart = contextStart - exonStarts[i];
+                adjustedFrame = (exonFrames[i] + distanceFromContextStart) % 3;
+            }
+    
+            contextExons.push({
+                exonNumber: i + 1,
+                startOffset,
+                endOffset,
+                frame: adjustedFrame
+            });
+        }
+    }
+    
+    // Debug log
+    console.log("Context Exons:", contextExons);
+
+    return { contextExons };
+}
