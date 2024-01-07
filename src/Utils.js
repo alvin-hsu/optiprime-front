@@ -166,9 +166,8 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
                 console.log(distanceFromContextStart);
                 adjustedFrame = (exonFrames[i] + distanceFromContextStart) % 3;
             }
-    
             contextExons.push({
-                exonNumber: i + 1,
+                exonNumber: (geneData.strand === '+' ? i + 1 : exonStarts.length - i - 1),
                 startOffset,
                 endOffset,
                 frame: adjustedFrame
