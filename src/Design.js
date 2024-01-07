@@ -212,7 +212,7 @@ function Step3({ data, handleStep, setData }) {
             const {contextExons}  = getContextExonTranslations(refSeq, data.coords.pos, contextLen);
             // Use contextExons and contextFrame as needed
             const exonAnnotations = contextExons.map(exon => ({
-                name: `Exon ${exon.exonNumber}`, // Naming each exon
+                name: `${refSeq.name2} Exon ${exon.exonNumber}`, // Naming each exon
                 start: exon.startOffset, 
                 end: exon.endOffset,
                 direction: refSeq.strand === "+" ? 1 : -1, // Assuming refSeq is available
