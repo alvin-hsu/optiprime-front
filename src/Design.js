@@ -146,13 +146,13 @@ const Step2 = ({data, handleStep, setData}) => {
  * - rs113993960 -> exon (CDS), TCTT>T (or delTCT or delCTT) (DNA), del F (protein). Gene goes in + strand
  */
 function Step3({ data, handleStep, setData }) {
-    const [sequence, setSequence] = useState('');
     const [refSeq, setRefSeq] = useState(null);
     const [position, setPosition] = useState('');
+    const [sequence, setSequence] = useState('');
     const [annotations, setAnnotations] = useState([]);
     const [translations, setTranslations] = useState([]);
 
-    let contextLen = 300
+    let contextLen = 300;
 
     // ---------------------------- GET SEQ
     useEffect(() => {
@@ -169,10 +169,7 @@ function Step3({ data, handleStep, setData }) {
         // Fetch reference and determine position
         coordsToRefSeq(data.coords)
             .then(refSeq => {
-                console.log(refSeq);
-                
-                window.refSeq = refSeq; // for debugging
-                
+                console.log(refSeq);                
                 setRefSeq(refSeq);
                 const pos = isIntronOrExon(data.coords.pos, refSeq);
                 console.log(pos);
@@ -272,21 +269,52 @@ function Step3({ data, handleStep, setData }) {
     const handleEditSubmit = (event) => {
         event.preventDefault(); // Prevent the default form submission from breaking the code flow
 
+        let newSequence;
         if (selectionRange.start !== selectionRange.end) {
             // Replace the selected sequence
-            const newSequence = sequence.substring(0, selectionRange.start) +
-                                editSequence +
-                                sequence.substring(selectionRange.end);
-            setSequence(newSequence);
+            newSequence = sequence.substring(0, selectionRange.start) +
+                          editSequence +
+                          sequence.substring(selectionRange.end);
         } else {
             // Insert at the cursor position
-            const newSequence = sequence.substring(0, selectionRange.start) +
-                                editSequence +
-                                sequence.substring(selectionRange.start);
-            setSequence(newSequence);
+            newSequence = sequence.substring(0, selectionRange.start) +
+                          editSequence +
+                          sequence.substring(selectionRange.start);
         }
+
+        setSequence(newSequence);
+    
         handleClosePopup();
     };
+
+    const handleSubmit = () => {
+        console.log("updating unedited data...");
+        setData(prevData => ({
+            ...prevData, 
+            unedited: {
+                sequence: sequence,
+                translations: translations,
+                annotations: annotations, 
+                contextLen: contextLen,
+            }
+        }));
+
+        handleStep(3, 4)
+    }
+
+    // // update global state 
+    // useEffect(() => {
+    //     console.log("updating unedited data...");
+    //     setData(prevData => ({
+    //         ...prevData, 
+    //         unedited: {
+    //             sequence: sequence,
+    //             translations: translations,
+    //             annotations: annotations, 
+    //             contextLen: contextLen,
+    //         }
+    //     }));
+    // }, [sequence, translations, annotations, contextLen])
 
     const handleSequenceChange = (selection) => {
         setSelectionRange({ start: selection.start, end: selection.end });
@@ -295,7 +323,7 @@ function Step3({ data, handleStep, setData }) {
     return (
         <>
             <div style={{ width: '100%' }}>
-                Step3<br/>
+                <h1>Prepare unedited sequence</h1>
                 Position: {position && `${position[0]}, ${position[1]}`}<br/>
                 <div style={{ height: '500px', width: '100%', position: 'relative', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                     <SeqViz
@@ -308,9 +336,15 @@ function Step3({ data, handleStep, setData }) {
                     />
                 </div>
             </div>
+
             <div>
                 <button onClick={handleOpenPopup}>Edit</button>
             </div>
+            <br/>
+            <div>
+                <button onClick={handleSubmit}>Save Changes</button>
+            </div>
+
             <Popup open={isPopupOpen} closeOnEscape onClose={handleClosePopup}>
                 {/* This is a form so you can confirm by just pressing enter */}
                 <form onSubmit={handleEditSubmit}>
@@ -325,25 +359,7 @@ function Step3({ data, handleStep, setData }) {
     );
 }
 
-/* Step 4 - Prepare unedited sequence
- * 
- * Output: 
- * - Final sequence to be edited with N(50?)bp context.
- * 
- * We now have access to the unedited DNA sequence (either because the user directly provided it or 
- * we fetched it from the corresponding rsID). Since this isn't necessarily the exact sequence targeted,
- * we'll use benchling's SeqViz to display the original sequence +-50bp and let the user make changes to match the actual 
- * DNA they're dealing with. 
- * 
- * If exon -> Display AA as well.
- * 
- */ 
-function Step4({data, handleStep, setData}) {
-    console.log(data);
-    return <div>Step4</div>
-}
-
-/* Step 5 - Prepare edited sequence
+/* Step 4 - Prepare edited sequence
  * 
  * Output:
  * - Target edit
@@ -368,8 +384,108 @@ function Step4({data, handleStep, setData}) {
  * if you're not in an exon. 
  * 
  */ 
+function Step4({data, handleStep, setData}) {
+    const [sequence, setSequence] = useState(data.unedited.sequence);
+    const [annotations, setAnnotations] = useState(data.unedited.annotations);
+    const [translations, setTranslations] = useState(data.unedited.translations);
+    
+    let contextLen = data.unedited.contextLen;
+
+    console.log("Step4 Data:", data);
+
+    // ---------------------------- EDIT POPUP
+    const [isPopupOpen, setIsPopupOpen] = useState(false);
+    const [editSequence, setEditSequence] = useState('');
+    const [selectionRange, setSelectionRange] = useState({ start: 0, end: 0 });
+
+    const handleOpenPopup = () => {
+        setIsPopupOpen(true);
+    };
+
+    const handleClosePopup = () => {
+        setIsPopupOpen(false);
+    };
+
+    const handleEditSubmit = (event) => {
+        event.preventDefault(); // Prevent the default form submission from breaking the code flow
+
+        let newSequence;
+        if (selectionRange.start !== selectionRange.end) {
+            // Replace the selected sequence
+            newSequence = sequence.substring(0, selectionRange.start) +
+                          editSequence +
+                          sequence.substring(selectionRange.end);
+        } else {
+            // Insert at the cursor position
+            newSequence = sequence.substring(0, selectionRange.start) +
+                          editSequence +
+                          sequence.substring(selectionRange.start);
+        }
+
+        setSequence(newSequence);
+    
+        handleClosePopup();
+    };
+
+    const handleSubmit = () => {
+        console.log("updating edited data...");
+        setData(prevData => ({
+            ...prevData, 
+            edited: {
+                sequence: sequence,
+                translations: translations,
+                annotations: annotations, 
+                contextLen: contextLen,
+            }
+        }));
+
+        handleStep(4, 5)
+    }
+
+    const handleSequenceChange = (selection) => {
+        setSelectionRange({ start: selection.start, end: selection.end });
+    };
+
+    return (
+        <>
+            <div style={{ width: '100%' }}>
+                <h1>Prepare EDIT</h1>
+                <div style={{ height: '500px', width: '100%', position: 'relative', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                    <SeqViz
+                        name="Custom Sequence"
+                        seq={sequence}
+                        viewer="linear"
+                        annotations={annotations}
+                        translations={translations}
+                        onSelection={handleSequenceChange}
+                    />
+                </div>
+            </div>
+
+            <div>
+                <button onClick={handleOpenPopup}>Edit</button>
+            </div>
+            <br/>
+            <div>
+                <button onClick={handleSubmit}>Save Changes</button>
+            </div>
+
+            <Popup open={isPopupOpen} closeOnEscape onClose={handleClosePopup}>
+                {/* This is a form so you can confirm by just pressing enter */}
+                <form onSubmit={handleEditSubmit}>
+                    <div>
+                        <input type="text" value={editSequence} onChange={e => setEditSequence(e.target.value)} />
+                        <button type="submit">Submit</button>
+                        <button type="button" onClick={handleClosePopup}>Cancel</button>
+                    </div>
+                </form>
+            </Popup>
+        </>
+    );}
+
+
 function Step5({data, handleStep, setData}) {
-    console.log(data);
+    console.log("Step 5", data);
     return <div>Step5</div>
 }
 
