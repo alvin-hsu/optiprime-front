@@ -152,7 +152,7 @@ function Step3({ data, handleStep, setData }) {
     const [annotations, setAnnotations] = useState([]);
     const [translations, setTranslations] = useState([]);
 
-    let contextLen = 50
+    let contextLen = 400
 
     // ---------------------------- GET SEQ
     useEffect(() => {
@@ -211,7 +211,7 @@ function Step3({ data, handleStep, setData }) {
         if (refSeq) {
             const {contextExons}  = getContextExonTranslations(refSeq, data.coords.pos, contextLen);
             // Use contextExons and contextFrame as needed
-            const annotations = contextExons.map(exon => ({
+            const exonAnnotations = contextExons.map(exon => ({
                 name: `Exon ${exon.exonNumber}`, // Naming each exon
                 start: exon.startOffset, 
                 end: exon.endOffset,
@@ -219,7 +219,7 @@ function Step3({ data, handleStep, setData }) {
                 color: "orange", // You can choose a color coding scheme
             }));
     
-            setAnnotations(annotations);
+            setAnnotations(prevAnnotations => [...prevAnnotations, ...exonAnnotations]);
                 
             const contextTranslations = contextExons.map(exon => {
                 let translationStart = exon.startOffset + exon.frame; // Adjust for the frame
