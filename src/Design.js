@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useSpring, animated } from "react-spring";
-import { rsIDtoHg38Coords, fetchSequenceFromCoords, coordsToRefSeq, isIntronOrExon, getContextExonTranslations} from "./Utils"
-import { SeqViz, SelectionHandler } from "seqviz";
+import { rsIDtoHg38Coords, fetchSequenceFromCoords, coordsToRefSeq,
+    isIntronOrExon, getContextExonTranslations, makeCDSAandTs} from "./Utils"
+import { SeqViz } from "seqviz";
 import Popup from 'reactjs-popup';
 
 
@@ -163,7 +164,7 @@ function Step3({ data, handleStep, setData }) {
                 setSequence(seq); 
             })
             .catch(error => {
-                console.error("Error fetching seq:", error);
+                console.error("Error fetching seq:", error);  // FIXME: Add a better error
             });
 
         // Fetch reference and determine position
@@ -176,7 +177,7 @@ function Step3({ data, handleStep, setData }) {
                 setPosition(pos);
             })
             .catch(error => {
-                console.error("Error fetching refSeq:", error);
+                console.error("Error fetching refSeq:", error);  // FIXME: Add a better error
             });
     }, [data.coords, contextLen]); // Only rerun the effect if data.coords changes
 
@@ -208,45 +209,21 @@ function Step3({ data, handleStep, setData }) {
     useEffect(() => {
         if (refSeq) {
             const {contextExons}  = getContextExonTranslations(refSeq, data.coords.pos, contextLen);
-            // Use contextExons and contextFrame as needed
-            const exonAnnotations = contextExons.map(exon => ({
-                name: `${refSeq.name2} Exon ${exon.exonNumber}`, // Naming each exon
-                start: exon.startOffset, 
-                end: exon.endOffset,
-                direction: refSeq.strand === "+" ? 1 : -1, // Assuming refSeq is available
-                color: "orange", // You can choose a color coding scheme
-            }));
-    
-            setAnnotations(prevAnnotations => [...prevAnnotations, ...exonAnnotations]);
-                
-            const contextTranslations = contextExons.map(exon => {
-                let adjFrame, translationEnd, translationStart;
-                let cdsStart = refSeq.cdsStart - data.coords.pos + contextLen;
-                let cdsEnd = refSeq.cdsEnd - data.coords.pos + contextLen;
-                if (refSeq.strand === '+') {
-                    adjFrame = (3 - exon.frame) % 3;  // Huge shoutout to NCBI for making this weird
-                    translationStart = exon.startOffset + adjFrame; // Adjust for the frame
-                    translationStart = Math.max(translationStart, cdsStart);
-                    translationEnd = Math.min(exon.endOffset, cdsEnd);
-                } else {
-                    let exonLen = exon.endOffset - exon.startOffset;
-                    adjFrame = (exonLen + exon.frame) % 3;  // Huge shoutout to NCBI for making this weird AND inconsistent
-                    translationStart = exon.startOffset + adjFrame;  // Bonus shoutout to seqViz for translation
-                    translationStart = Math.max(translationStart, cdsStart);
-                    translationEnd = Math.min(exon.endOffset, cdsEnd);
-                }
-
-                return {
-                    start: translationStart,
-                    end: translationEnd,
-                    direction: refSeq.strand === "+" ? 1 : -1,
-                };
-            });
-
-            console.log("Translations:", contextTranslations);
-
-            setTranslations(contextTranslations)
-    
+            // Add annotations and translations for each exon
+            const cdsAandTs = contextExons.map(exon => makeCDSAandTs(
+                `${refSeq["name2"]} Exon ${exon.exonNumber}`, // Naming each exon
+                exon.startOffset,
+                exon.endOffset,
+                refSeq["strand"],
+                exon.frame
+            ));
+            console.log(cdsAandTs);
+            const cdsAnnotations = cdsAandTs.map(cds => cds.annotation);
+            const cdsTranslations = cdsAandTs.map(cds => cds.translation);
+            console.log(cdsAnnotations);
+            console.log(cdsTranslations);
+            setAnnotations(prevAnnotations => [...prevAnnotations, ...cdsAnnotations]);
+            setTranslations(cdsTranslations);
         } else {
             console.log("refSeq is null");
         }
