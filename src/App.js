@@ -7,6 +7,7 @@ import Design from "./Design"
 import Header from "./Header"
 import Home from "./Home"
 import OtherLinks from "./Other";
+import EditableSeqViz from "./EditableSeqViz";
 import REST from "./REST"
 
 import "./App.css"
@@ -31,6 +32,7 @@ function App() {
             <Route path="/about" element={<About />} />
             <Route path="/other" element={<OtherLinks />}/>
             <Route path="/design" element={<Design />} />
+            <Route path="/seqviz" element={<EditableSeqViz />} />
           </Routes>
         </CSSTransition>
       </SwitchTransition>
