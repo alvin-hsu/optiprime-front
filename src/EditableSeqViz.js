@@ -166,10 +166,19 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
         };
     }, [isEditable, seqData.seq, selection, isIns, isDel, undoStack]);  // eslint-disable-line
 
+    // IF NOT EDITABLE, DISABLE SELECTION
+    const selectionHandler = (userSelection) => {
+        if (!isEditable) {
+            setSelection({ clockwise: true, start: NaN, end: NaN });
+        } else {
+            setSelection(userSelection);
+        }
+    };
+
     // MANAGE CDS'S
     useEffect(() => {
         // Check if selection is a range
-        if (selection.start === null || selection.start === selection.end) {
+        if (!isEditable || selection.start === null || selection.start === selection.end) {
             setShowAddCDS(false);
             setShowCDSCtrls(false);
             return;
@@ -194,7 +203,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
             setShowCDSCtrls(false);
             setCurrCDS(null);
         }
-    }, [seqData.cdsList, selection]);
+    }, [isEditable, seqData, selection]);
     const handleAddCDS = () => {
         const selStart = Math.min(selection.start, selection.end);
         const selEnd = Math.max(selection.start, selection.end);
@@ -256,14 +265,14 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
 
     return (
         <div style={{ height: "100%", verticalAlign: "top" }}>
-            <div style={{ height: "120px", width: "100%", display: "block", marginBottom: "25px" }}>
+            <div style={{ height: "135px", width: "100%", display: "block", marginBottom: "25px" }}>
                 <SeqViz
                     { ...seqData }
                     viewer="linear"
                     selection={selection}
                     annotations={annotations}
                     translations={translations}
-                    onSelection={setSelection}
+                    onSelection={selectionHandler}
                 />
             </div>
             { showWarn &&

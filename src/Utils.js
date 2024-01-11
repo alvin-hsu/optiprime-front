@@ -182,7 +182,7 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
         }
     }
     // console.log("Context Exons:", contextExons);
-    return { contextExons };
+    return contextExons;
 }
 
 /*

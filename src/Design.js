@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useSpring, animated } from "react-spring";
-import { rsIDtoHg38Coords, fetchSequenceFromCoords, coordsToRefSeq,
-         indexAnnotations, getContextExonTranslations, makeCDSAandTs} from "./Utils"
-import { SeqViz } from "seqviz";
-import Popup from 'reactjs-popup';
+
+import { rsIDtoHg38Coords, fetchSequenceFromCoords, coordsToRefSeq, getContextExonTranslations}
+    from "./Utils";
+import EditableSeqViz from "./EditableSeqViz";
 
 
-const _CONTEXT_LEN = 300;
+const _CONTEXT_LEN = 50;
 
 const Prompt = ({ text }) => {
     return (
@@ -26,7 +26,7 @@ const Step0 = ({ handleStep }) => {
     );
 };
 
-const Step1 = ({ data, handleStep, setData }) => {
+const Step1 = ({ handleStep, data, setData }) => {
     const [rsID, setRsID] = useState("rsID" in data ? data.rsID : "");
     const [loadingText, setLoadingText] = useState("");
     const handleInputChange = (event) => {
@@ -61,7 +61,7 @@ const Step1 = ({ data, handleStep, setData }) => {
     );
 }
 
-const Step2 = ({ data, handleStep, setData }) => {
+const Step2 = ({ handleStep, data, setData }) => {
     const initHasCoords = ("coords" in data);
     const [assembly, setAssembly] = useState(initHasCoords ? data.coords.assembly : "");
     const [inputVisible, setInputVisible] = useState(initHasCoords);
@@ -123,6 +123,7 @@ const Step2 = ({ data, handleStep, setData }) => {
                 onClick={handleSubmit}
                 disabled={!validCoords}
             >Submit</button>
+            <button className="menu-btn" onClick={() => handleStep(2, 3)}>No</button>
         </div>
     );
 };
@@ -168,22 +169,24 @@ const Step2 = ({ data, handleStep, setData }) => {
  * - rs782665893 -> exon (CDS), C>T (DNA) V>M (protein). Gene goes in - strand
  * - rs113993960 -> exon (CDS), TCTT>T (or delTCT or delCTT) (DNA), del F (protein). Gene goes in + strand
  */
-function Step3({ data, handleStep, setData }) {
+function Step3({ handleStep, data, setData }) {
+    const [uneditedData, setUneditedData] = useState("unedited" in data ? data.unedited :
+                                                     { seq: "",
+                                                       cdsList: [],
+                                                       annotations: [],
+                                                       translations: [] });
     const [loadingText, setLoadingText] = useState("");
-    const [sequence, setSequence] = useState("");
-    const [annotations, setAnnotations] = useState([]);
-    const [translations, setTranslations] = useState([]);
-    const [geneName, setGeneName] = useState("");
     const [txDirection, setTxDirection] = useState("+");
 
     // GET SEQUENCE WITH CONTEXT AND TRANSLATION
     useEffect(() => {
+        if (!data.coords) { return; }
         setLoadingText("Querying UCSC genome browser API...");
         // Fetch sequence
         fetchSequenceFromCoords(data.coords, _CONTEXT_LEN)
             .then(seq => {
                 console.log("Seq from coords:" + seq);
-                setSequence(seq);
+                setUneditedData(u => ({ ...u, seq: seq }));
                 setLoadingText("");
             })
             .catch(error => {
@@ -193,15 +196,11 @@ function Step3({ data, handleStep, setData }) {
         coordsToRefSeq(data.coords)
             .then(refSeq => {
                 console.log(refSeq);
-                setGeneName(refSeq["name2"]);
                 setTxDirection(refSeq["strand"]);
-                const {contextExons} = getContextExonTranslations(refSeq, data.coords.pos, _CONTEXT_LEN);
-                // Add annotations and translations for each exon
-                const cdsAandTs = contextExons.map(exon => makeCDSAandTs(exon));
-                const cdsAnnotations = cdsAandTs.map(cds => cds.annotation);
-                const cdsTranslations = cdsAandTs.map(cds => cds.translation);
-                setAnnotations(prevAnnotations => [...prevAnnotations, ...cdsAnnotations]);
-                setTranslations(cdsTranslations);
+                const contextExons = getContextExonTranslations(refSeq,
+                                                                data.coords.pos,
+                                                                _CONTEXT_LEN);
+                setUneditedData(u => ({ ...u, cdsList: contextExons }));
             })
             .catch(error => {
                 console.error("Error fetching refSeq:", error);  // FIXME: Add a better error
@@ -210,107 +209,42 @@ function Step3({ data, handleStep, setData }) {
 
     // HIGHLIGHT MUTATION IF GIVEN AS RSID
     useEffect(() => {
-        if (data.alleles !== null) {
-            const uneditedLen = data.alleles.split('/')[0].length;
-            const newAnnotations = {
-                name: data.rsID,
-                start: _CONTEXT_LEN,
-                end: _CONTEXT_LEN + uneditedLen,
-                direction: txDirection === "+" ? 1 : -1,
-                color: "blue",
-            };
-            setAnnotations([newAnnotations]);
-        }
+        if (!data.alleles) { return; }
+        const uneditedLen = data.alleles.split('/')[0].length;
+        const newAnnotation = {
+            name: data.rsID,
+            start: _CONTEXT_LEN,
+            end: _CONTEXT_LEN + uneditedLen,
+            direction: txDirection === "+" ? 1 : -1,
+            color: "blue",
+        };
+        setUneditedData(u => ({ ...u, annotations: [newAnnotation] }));
     }, [data.rsID, data.alleles, txDirection]);
-
-    // ---------------------------- EDIT POPUP
-    const [isPopupOpen, setIsPopupOpen] = useState(false);
-    const [editSequence, setEditSequence] = useState('');
-    const [selectionRange, setSelectionRange] = useState({ start: 0, end: 0 });
-
-    const handleOpenPopup = () => {
-        setIsPopupOpen(true);
-    };
-
-    const handleClosePopup = () => {
-        setIsPopupOpen(false);
-    };
-
-    const handleEditSubmit = (event) => {
-        event.preventDefault(); // Prevent the default form submission from breaking the code flow
-
-        let newSequence;
-        if (selectionRange.start !== selectionRange.end) {
-            // Replace the selected sequence
-            newSequence = sequence.substring(0, selectionRange.start) +
-                          editSequence +
-                          sequence.substring(selectionRange.end);
-        } else {
-            // Insert at the cursor position
-            newSequence = sequence.substring(0, selectionRange.start) +
-                          editSequence +
-                          sequence.substring(selectionRange.start);
-        }
-
-        setSequence(newSequence);
-    
-        handleClosePopup();
-    };
 
     const handleSubmit = () => {
         console.log("updating unedited data...");
-        setData(prevData => ({
-            ...prevData, 
-            unedited: {
-                sequence: sequence,
-                translations: translations,
-                annotations: annotations, 
-                contextLen: _CONTEXT_LEN,
-            }
-        }));
-
+        setData(prevData => ({ ...prevData, unedited: uneditedData }));
         handleStep(3, 4)
     }
-
-    const handleSequenceChange = (selection) => {
-        setSelectionRange({ start: selection.start, end: selection.end });
-    };
 
     return (
         <>
             <div style={{ width: '100%' }}>
-                <h1>Prepare unedited sequence</h1>
-                { geneName }: {}
-                <div style={{ height: '500px', width: '100%', position: 'relative', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-                    <SeqViz
-                        name="Custom Sequence"
-                        seq={sequence}
-                        viewer="linear"
-                        annotations={annotations}
-                        translations={translations}
-                        onSelection={handleSequenceChange}
-                    />
-                </div>
+                <h1>Unedited sequence:</h1>
+                <EditableSeqViz
+                    isEditable={true}
+                    seqData={uneditedData}
+                    setSeqData={setUneditedData}
+                />
             </div>
-
-            <div>
-                <button onClick={handleOpenPopup}>Edit</button>
-            </div>
-            <br/>
+            <br />
+            {uneditedData.seq === "" &&
+            <p>
+                (start typing...)
+            </p>}
             <div>
                 <button onClick={handleSubmit}>Save Changes</button>
             </div>
-
-            <Popup open={isPopupOpen} closeOnEscape onClose={handleClosePopup}>
-                {/* This is a form so you can confirm by just pressing enter */}
-                <form onSubmit={handleEditSubmit}>
-                    <div>
-                        <input type="text" value={editSequence} onChange={e => setEditSequence(e.target.value)} />
-                        <button type="submit">Submit</button>
-                        <button type="button" onClick={handleClosePopup}>Cancel</button>
-                    </div>
-                </form>
-            </Popup>
             <div>{loadingText}</div>
         </>
     );
@@ -342,101 +276,39 @@ function Step3({ data, handleStep, setData }) {
  * 
  */ 
 function Step4({data, handleStep, setData}) {
-    const [sequence, setSequence] = useState(data.unedited.sequence);
-    const [annotations, setAnnotations] = useState(data.unedited.annotations);
-    const [translations, setTranslations] = useState(data.unedited.translations);
-    
-    let contextLen = data.unedited.contextLen;
-
-    console.log("Step4 Data:", data);
-
-    // ---------------------------- EDIT POPUP
-    const [isPopupOpen, setIsPopupOpen] = useState(false);
-    const [editSequence, setEditSequence] = useState('');
-    const [selectionRange, setSelectionRange] = useState({ start: 0, end: 0 });
-
-    const handleOpenPopup = () => {
-        setIsPopupOpen(true);
-    };
-
-    const handleClosePopup = () => {
-        setIsPopupOpen(false);
-    };
-
-    const handleEditSubmit = (event) => {
-        event.preventDefault(); // Prevent the default form submission from breaking the code flow
-
-        let newSequence;
-        if (selectionRange.start !== selectionRange.end) {
-            // Replace the selected sequence
-            newSequence = sequence.substring(0, selectionRange.start) +
-                          editSequence +
-                          sequence.substring(selectionRange.end);
-        } else {
-            // Insert at the cursor position
-            newSequence = sequence.substring(0, selectionRange.start) +
-                          editSequence +
-                          sequence.substring(selectionRange.start);
-        }
-
-        setSequence(newSequence);
-    
-        handleClosePopup();
-    };
+    // TODO: Update edited with rsID if present
+    // TODO: Alignment for highlighting
+    const [uneditedData, setUneditedData] = useState(data.unedited);
+    const [editedData, setEditedData] = useState(data.unedited);
 
     const handleSubmit = () => {
         console.log("updating edited data...");
-        setData(prevData => ({
-            ...prevData, 
-            edited: {
-                sequence: sequence,
-                translations: translations,
-                annotations: annotations, 
-                contextLen: contextLen,
-            }
-        }));
-
-        handleStep(4, 5)
+        setData(prevData => ({ ...prevData, unedited: uneditedData, edited: editedData }));
+        handleStep(4, 5);
     }
-
-    const handleSequenceChange = (selection) => {
-        setSelectionRange({ start: selection.start, end: selection.end });
-    };
 
     return (
         <>
             <div style={{ width: '100%' }}>
-                <h1>Prepare EDIT</h1>
-                <div style={{ height: '500px', width: '100%', position: 'relative', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-                    <SeqViz
-                        name="Custom Sequence"
-                        seq={sequence}
-                        viewer="linear"
-                        annotations={annotations}
-                        translations={translations}
-                        onSelection={handleSequenceChange}
-                    />
-                </div>
+                <h1>Unedited sequence:</h1>
+                <EditableSeqViz
+                    isEditable={false}
+                    seqData={uneditedData}
+                    setSeqData={setUneditedData}
+                />
             </div>
-
-            <div>
-                <button onClick={handleOpenPopup}>Edit</button>
+            <div style={{ width: '100%' }}>
+                <h1>Edited sequence:</h1>
+                <EditableSeqViz
+                    isEditable={true}
+                    seqData={editedData}
+                    setSeqData={setEditedData}
+                />
             </div>
-            <br/>
+            <br />
             <div>
                 <button onClick={handleSubmit}>Save Changes</button>
             </div>
-
-            <Popup open={isPopupOpen} closeOnEscape onClose={handleClosePopup}>
-                {/* This is a form so you can confirm by just pressing enter */}
-                <form onSubmit={handleEditSubmit}>
-                    <div>
-                        <input type="text" value={editSequence} onChange={e => setEditSequence(e.target.value)} />
-                        <button type="submit">Submit</button>
-                        <button type="button" onClick={handleClosePopup}>Cancel</button>
-                    </div>
-                </form>
-            </Popup>
         </>
     );
 }
