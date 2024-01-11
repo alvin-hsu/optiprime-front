@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useSpring, animated } from "react-spring";
 import { rsIDtoHg38Coords, fetchSequenceFromCoords, coordsToRefSeq,
-    isIntronOrExon, getContextExonTranslations, makeCDSAandTs} from "./Utils"
+         indexAnnotations, getContextExonTranslations, makeCDSAandTs} from "./Utils"
 import { SeqViz } from "seqviz";
 import Popup from 'reactjs-popup';
 
+
+const _CONTEXT_LEN = 300;
 
 const Prompt = ({ text }) => {
     return (
@@ -12,19 +14,19 @@ const Prompt = ({ text }) => {
             {text}
         </div>
     );
-}
+};
 
-const Step0 = ({handleStep}) => {
+const Step0 = ({ handleStep }) => {
     return (
         <div>
             <Prompt text="Is the genotype you want to edit from the human genome?" />
             <button className="menu-btn" onClick={() => handleStep(0, 1)}>Yes</button>
             <button className="menu-btn" onClick={() => handleStep(0, 4)}>No</button>
         </div>
-    )
-}
+    );
+};
 
-const Step1 = ({data, handleStep, setData}) => {
+const Step1 = ({ data, handleStep, setData }) => {
     const [rsID, setRsID] = useState("rsID" in data ? data.rsID : "");
     const [loadingText, setLoadingText] = useState("");
     const handleInputChange = (event) => {
@@ -32,23 +34,22 @@ const Step1 = ({data, handleStep, setData}) => {
         setRsID("rs" + newRsId);
     };
     const handleSubmit = () => {
-        setData(prevData => ({...prevData, rsID: rsID}));
+        setData(prevData => ({ ...prevData,
+                               rsID: rsID }));
         setLoadingText("Querying dbSNP...");
         rsIDtoHg38Coords(rsID).then(entry => {
-            setData(prevData => ({...prevData, coords:
-                    {assembly: "hg38",
-                     chrom: "chr" + entry[1],
-                     pos: entry[2],
-                     gene: entry[3],
-                     alleles: entry[4],
-                     mode: "install"}}));
+            setData(prevData => ({ ...prevData,
+                                   coords: { assembly: "hg38",
+                                             chrom: "chr" + entry[1],
+                                             pos: entry[2] },
+                                   gene: entry[3],
+                                   alleles: entry[4] }));
         }).finally(() => {
-            setLoadingText("Querying UCSC genome browser...");
             handleStep(1, 3);
         }).catch(error => {
-            console.error(error);
+            console.error(error);  // TODO: Better error message
         });
-    }
+    };
     return (
         <div>
             <Prompt text="Do you have an rsID for the mutation you're interested in?" /><br />
@@ -60,22 +61,39 @@ const Step1 = ({data, handleStep, setData}) => {
     );
 }
 
-const Step2 = ({data, handleStep, setData}) => {
-    const initHasCoords = ("coords" in data)
-    const [coords, setCoords] = useState(initHasCoords ? data.coords : {});
+const Step2 = ({ data, handleStep, setData }) => {
+    const initHasCoords = ("coords" in data);
     const [assembly, setAssembly] = useState(initHasCoords ? data.coords.assembly : "");
     const [inputVisible, setInputVisible] = useState(initHasCoords);
-    const [chrCoords, setChrCoords] = useState(initHasCoords ? data.coords.chrcoord : "")
+    const [chrCoords, setChrCoords] = useState(initHasCoords ? data.coords.chrom + ":" + data.coords.pos : "");
+    const [validCoords, setValidCoords] = useState(initHasCoords);
 
     const handleDropdownChange = (event) => {
         setAssembly(event.target.value);
         setInputVisible(!(event.target.value === ""));
     };
-
     const handleInputChange = (event) => {
-        setChrCoords(event.target.value);
-    }
-
+        let newChrCoords = event.target.value.toUpperCase();
+        newChrCoords = newChrCoords.replace(/[^0-9XY:]/g, "");
+        const isValid = /(?:\d|1\d|2[0-2]|[XY]):\d+/.test(newChrCoords);
+        if (isValid) {
+            setValidCoords(true);
+            setChrCoords("chr" + newChrCoords);
+        } else {
+            setValidCoords(false);
+            setChrCoords(event.target.value);
+        }
+    };
+    const handleSubmit = () => {
+        const [chrom, pos] = chrCoords.split(":");
+        setData(prevData => ({...prevData,
+                              coords: { assembly: assembly,
+                                        chrom: chrom,
+                                        pos: pos },
+                              gene: null,
+                              alleles: null}));
+        handleStep(2, 3);
+    };
     const dropdownOptions = [
         { value: "hg18", label: "hg18 (NCBI36)" },
         { value: "hg19", label: "hg19 (GRCh37)" },
@@ -98,15 +116,19 @@ const Step2 = ({data, handleStep, setData}) => {
             <input
                 value={chrCoords}
                 onChange={handleInputChange}
-                placeholder="chrom:pos"
-            />
-        )}
+                placeholder="chr:pos"
+            /> )}
+            <button
+                className="menu-btn"
+                onClick={handleSubmit}
+                disabled={!validCoords}
+            >Submit</button>
         </div>
     );
-}
+};
 
-
-/* Step 3 - Fetch DNA sequence from rsID
+/* Step 3 - Fetch DNA sequence from coords and let user edit it if their context is different.
+ *          If coords are not provided, let user enter their own input.
  *
  * Output: 
  * - Unedited DNA sequence around the target edit site
@@ -147,88 +169,59 @@ const Step2 = ({data, handleStep, setData}) => {
  * - rs113993960 -> exon (CDS), TCTT>T (or delTCT or delCTT) (DNA), del F (protein). Gene goes in + strand
  */
 function Step3({ data, handleStep, setData }) {
-    const [refSeq, setRefSeq] = useState(null);
-    const [position, setPosition] = useState('');
-    const [sequence, setSequence] = useState('');
+    const [loadingText, setLoadingText] = useState("");
+    const [sequence, setSequence] = useState("");
     const [annotations, setAnnotations] = useState([]);
     const [translations, setTranslations] = useState([]);
+    const [geneName, setGeneName] = useState("");
+    const [txDirection, setTxDirection] = useState("+");
 
-    let contextLen = 300;
-
-    // ---------------------------- GET SEQ
+    // GET SEQUENCE WITH CONTEXT AND TRANSLATION
     useEffect(() => {
+        setLoadingText("Querying UCSC genome browser API...");
         // Fetch sequence
-        fetchSequenceFromCoords(data.coords, contextLen)
+        fetchSequenceFromCoords(data.coords, _CONTEXT_LEN)
             .then(seq => {
                 console.log("Seq from coords:" + seq);
-                setSequence(seq); 
+                setSequence(seq);
+                setLoadingText("");
             })
             .catch(error => {
                 console.error("Error fetching seq:", error);  // FIXME: Add a better error
             });
-
         // Fetch reference and determine position
         coordsToRefSeq(data.coords)
             .then(refSeq => {
-                console.log(refSeq);                
-                setRefSeq(refSeq);
-                const pos = isIntronOrExon(data.coords.pos, refSeq);
-                console.log(pos);
-                setPosition(pos);
+                console.log(refSeq);
+                setGeneName(refSeq["name2"]);
+                setTxDirection(refSeq["strand"]);
+                const {contextExons} = getContextExonTranslations(refSeq, data.coords.pos, _CONTEXT_LEN);
+                // Add annotations and translations for each exon
+                const cdsAandTs = contextExons.map(exon => makeCDSAandTs(exon));
+                const cdsAnnotations = cdsAandTs.map(cds => cds.annotation);
+                const cdsTranslations = cdsAandTs.map(cds => cds.translation);
+                setAnnotations(prevAnnotations => [...prevAnnotations, ...cdsAnnotations]);
+                setTranslations(cdsTranslations);
             })
             .catch(error => {
                 console.error("Error fetching refSeq:", error);  // FIXME: Add a better error
             });
-    }, [data.coords, contextLen]); // Only rerun the effect if data.coords changes
+    }, [data.coords]); // Only rerun the effect if data.coords changes
 
-    // ---------------------------- HIGHLIGHT MUTATION
+    // HIGHLIGHT MUTATION IF GIVEN AS RSID
     useEffect(() => {
-        if (refSeq) {
-            const uneditedLen = data.coords.alleles.split('/')[0].length;
+        if (data.alleles !== null) {
+            const uneditedLen = data.alleles.split('/')[0].length;
             const newAnnotations = {
                 name: data.rsID,
-                start: contextLen,
-                end: contextLen + uneditedLen,
-                direction: refSeq.strand === "+" ? 1 : -1,
-                color: "blue",
-            };
-            setAnnotations([newAnnotations]);
-        } else {
-            const newAnnotations = {
-                name: data.rsID,
-                start: contextLen, // highlight the relevant mutation 
-                end: contextLen+1,
-                direction: 1,   // Guessing +, might be wrong 
+                start: _CONTEXT_LEN,
+                end: _CONTEXT_LEN + uneditedLen,
+                direction: txDirection === "+" ? 1 : -1,
                 color: "blue",
             };
             setAnnotations([newAnnotations]);
         }
-    }, [refSeq, data.coords.pos, contextLen]);
-
-    // ---------------------------- LABEL EXONS
-    useEffect(() => {
-        if (refSeq) {
-            const {contextExons}  = getContextExonTranslations(refSeq, data.coords.pos, contextLen);
-            // Add annotations and translations for each exon
-            const cdsAandTs = contextExons.map(exon => makeCDSAandTs(
-                `${refSeq["name2"]} Exon ${exon.exonNumber}`, // Naming each exon
-                exon.startOffset,
-                exon.endOffset,
-                refSeq["strand"],
-                exon.frame
-            ));
-            console.log(cdsAandTs);
-            const cdsAnnotations = cdsAandTs.map(cds => cds.annotation);
-            const cdsTranslations = cdsAandTs.map(cds => cds.translation);
-            console.log(cdsAnnotations);
-            console.log(cdsTranslations);
-            setAnnotations(prevAnnotations => [...prevAnnotations, ...cdsAnnotations]);
-            setTranslations(cdsTranslations);
-        } else {
-            console.log("refSeq is null");
-        }
-
-    }, [position, refSeq, data.coords.pos, contextLen]);
+    }, [data.rsID, data.alleles, txDirection]);
 
     // ---------------------------- EDIT POPUP
     const [isPopupOpen, setIsPopupOpen] = useState(false);
@@ -272,7 +265,7 @@ function Step3({ data, handleStep, setData }) {
                 sequence: sequence,
                 translations: translations,
                 annotations: annotations, 
-                contextLen: contextLen,
+                contextLen: _CONTEXT_LEN,
             }
         }));
 
@@ -287,7 +280,7 @@ function Step3({ data, handleStep, setData }) {
         <>
             <div style={{ width: '100%' }}>
                 <h1>Prepare unedited sequence</h1>
-                Position: {position && `${position[0]}, ${position[1]}`}<br/>
+                { geneName }: {}
                 <div style={{ height: '500px', width: '100%', position: 'relative', display: 'block', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                     <SeqViz
                         name="Custom Sequence"
@@ -318,6 +311,7 @@ function Step3({ data, handleStep, setData }) {
                     </div>
                 </form>
             </Popup>
+            <div>{loadingText}</div>
         </>
     );
 }
@@ -485,8 +479,8 @@ export default function Design() {
     const [data, setData] = useState({});
 
     const [transition, api] = useSpring(() => ({
-        from: { opacity: 0, transform: 'translate3d(100%,0,0)' },
-        to: { opacity: 1, transform: 'translate3d(0%,0,0)' },
+        from: { opacity: 0, transform: 'translate3d(200%,0,0)' },
+        to: { opacity: 1, transform: 'translate3d(0,0,0)' },
     }));
 
 
@@ -494,8 +488,8 @@ export default function Design() {
         setStep(nextStep);
         setStack(oldStack => [...oldStack, currStep]);
         api.start({
-            from: { opacity: 0, transform: 'translate3d(100%,0,0)' },
-            to: { opacity: 1, transform: 'translate3d(0%,0,0)' }
+            from: { opacity: 0, transform: 'translate3d(200%,0,0)' },
+            to: { opacity: 1, transform: 'translate3d(0,0,0)' }
         })
     } 
 

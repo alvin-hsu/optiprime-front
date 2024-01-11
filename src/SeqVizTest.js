@@ -2,14 +2,15 @@ import React, { useState } from "react";
 import EditableSeqViz from "./EditableSeqViz";
 
 export default function SeqVizTest() {
-    const [ seq, setSeq ] = useState("ACGT");
+    const [ seqData, setSeqData ] = useState({ seq: "",
+                                               cdsList: [],
+                                               annotations: [],
+                                               translations: [] });
 
     return (
-        <div style={{ width: "100%" }}>
+        <div style={{ height: "100%", width: "100%" }}>
             <h1>SeqViz Playground</h1>
-            <EditableSeqViz
-
-            />
+            <EditableSeqViz isEditable={true} seqData={seqData} setSeqData={setSeqData} />
         </div>
     )
 }

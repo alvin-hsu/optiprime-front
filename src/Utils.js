@@ -84,10 +84,10 @@ export const fetchSequenceFromCoords = async (coords, contextLen) => {
  * ncbiRefSeq objects from https://api.genome.ucsc.edu/getData/track
  *
  */
-export const isIntronOrExon = (index, geneData) => {
+export const indexAnnotations = (index, geneData) => {
     // console.log("Debug Parameters:", { index, geneData });
     if (!geneData || !geneData["exonStarts"] || !geneData["exonEnds"]) {
-        return ["invalid data", -1];
+        return { posType: "Intergenic" };
     }
     const exonStarts = geneData["exonStarts"].split(',').map(Number).filter(n => !isNaN(n));
     const exonEnds = geneData["exonEnds"].split(',').map(Number).filter(n => !isNaN(n));
@@ -96,17 +96,23 @@ export const isIntronOrExon = (index, geneData) => {
     for (let i = 0; i < exonStarts.length; i++) {
         if (index >= exonStarts[i] && index <= exonEnds[i]) {
             // it's an exon! Which one, where does it start and what's the frame?
-            return ["exon", i+1, exonStarts[i], exonFrames[i]];
+            return { posType: "Exon",
+                     exonNum: i + 1,
+                     exonStart: exonStarts[i],
+                     exonEnd: exonEnds[i],
+                     exonFrame: exonFrames[i] };  // TODO: Is this data necessary?
         }
     }
     // Out of scope?
     if (index < geneData["txStart"] || index > geneData["txEnd"]) {
-        return ["intergenic", -1];
+        return { posType: "Intergenic",
+                 nearestGene: geneData["name2"] };
     }
     // intron?
     for (let i = 0; i < exonEnds.length; i++) {
         if (index > exonEnds[i] && (i === exonEnds.length - 1 || index < exonStarts[i + 1])) {
-            return ["intron", i + 1];
+            return { posType: "Intergenic",
+                     prevExonNum: i + 1 };
         }
     }
     return ["huh?", -1]; // Default return if not caught by above cases
@@ -151,6 +157,7 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
         // - Start within end after
         // - Start within end within
         if (exonStarts[i] <= contextEnd && exonEnds[i] >= contextStart) {
+            const exonNumber = geneData["strand"] === '+' ? i + 1 : exonStarts.length - i - 1;
             // Clip to start/end in case of partial overlap
             const startOffset = Math.max(0, exonStarts[i] - contextStart);
             const endOffset = Math.min(exonEnds[i], contextEnd) - contextStart;
@@ -166,9 +173,10 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
                 adjustedFrame = (exonFrames[i] + distanceFromContextStart) % 3;
             }
             contextExons.push({
-                exonNumber: (geneData["strand"] === '+' ? i + 1 : exonStarts.length - i - 1),
-                startOffset,
-                endOffset,
+                name: `${geneData["name2"]} Exon ${exonNumber}`,
+                start: startOffset,
+                end: endOffset,
+                direction: geneData["strand"],
                 frame: adjustedFrame
             });
         }
@@ -181,7 +189,7 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
  * Make *A*nnotations and *T*ranslation props for a given CDS, as annotated from
  * getContextExonTranslations. Notably, start, end, and frame are taken directly from the output.
  */
-export const makeCDSAandTs = (name, start, end, direction, frame) => {
+export const makeCDSAandTs = ({ name, start, end, direction, frame }) => {
     // The annotation itself is easy
     const annotation = {
         name: name,

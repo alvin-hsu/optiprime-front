@@ -1,23 +1,37 @@
 import React, { useEffect, useState } from "react";
 import { SeqViz } from "seqviz";
 
+import { makeCDSAandTs } from "./Utils";
+
 
 const MAX_UNDO_STACK = 64;
 
-export default function EditableSeqViz() {
-
-
-    const [sequence, setSequence] = useState("ACGT");
-    const [selection, setSelection] = useState({clockwise: true, start: NaN, end: NaN});
-    const [showWarn, setShowWarn] = useState(false);
+export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
+    const [selection, setSelection] = useState(seqData.seq === "" ?
+                                               {clockwise: true, start: 0, end: 0} :
+                                               {clockwise: true, start: NaN, end: NaN});
+    // PASTE FUNCTIONALITY
     const [pasteData, setPasteData] = useState("");
+    const [showWarn, setShowWarn] = useState(false);
+    // UNDO STACK FUNCTIONALITY
     const [undoStack, setUndoStack] = useState([]);
     const [isIns, setIsIns] = useState(false);
     const [isDel, setIsDel] = useState(false);
+    // CDS FUNCTIONALITY
+    const [showAddCDS, setShowAddCDS] = useState(false);
+    const [showCDSCtrls, setShowCDSCtrls] = useState(false);
+    const [currCDS, setCurrCDS] = useState(null);
+    // CDS => ANNOTATIONS/TRANSLATIONS
+    const [annotations, setAnnotations] = useState(seqData.annotations);
+    const [translations, setTranslations] = useState(seqData.translations);
 
-    const selectionHandler = (userSelection) => { setSelection(userSelection); };
-
+    // MANAGE SEQUENCE EDITING FUNCTIONALITY
     useEffect(() => {
+        if (!isEditable) { return; }
+        const sequence = seqData.seq;
+        const setSequence = (newSeq) => {
+            setSeqData((prevSeqData) => ({ ...prevSeqData, seq: newSeq }));
+        };
         // Managing the undoStack
         const pushUndoStack = () => {
             console.log(undoStack);
@@ -25,7 +39,8 @@ export default function EditableSeqViz() {
                 if (prevUndoStack.length === MAX_UNDO_STACK) {
                     prevUndoStack = prevUndoStack.slice(1)
                 }
-                return [...prevUndoStack, {oldSequence: sequence, oldSelection: selection}]
+                return [...prevUndoStack, {oldSequence: sequence,
+                                           oldSelection: selection}]
             });
         };
         const popUndoStack = () => {
@@ -44,6 +59,7 @@ export default function EditableSeqViz() {
             let hasSelection = selection.start !== null;
             let keyUpper = event.key.toUpperCase();
             let isBase = "ACGT".includes(keyUpper);
+            setShowWarn(false);
             if (hasSelection && isBase) {
                 if (!isIns) {  // Set undo stack
                     pushUndoStack();
@@ -54,16 +70,16 @@ export default function EditableSeqViz() {
                 let selEnd = Math.max(selection.start, selection.end);
                 let selLen = selEnd - selStart;
                 if (selLen === 0) {
-                    setSequence((sequence) => sequence.substring(0, selStart) +
-                                              keyUpper +
-                                              sequence.substring(selStart));
+                    setSequence(sequence.substring(0, selStart) +
+                                keyUpper +
+                                sequence.substring(selStart));
                     setSelection({ ...selection,
                                  start: selStart + 1,
                                  end: selEnd + 1 });
                 } else {
-                    setSequence((sequence) => sequence.substring(0, selStart) +
-                                              keyUpper +
-                                              sequence.substring(selEnd));
+                    setSequence(sequence.substring(0, selStart) +
+                                keyUpper +
+                                sequence.substring(selEnd));
                     setSelection({ ...selection,
                                    start: selStart + 1,
                                    end: selStart + 1 });
@@ -73,6 +89,7 @@ export default function EditableSeqViz() {
         const keydownHandler = (event) => {
             let hasSelection = selection.start !== null;
             let isBackspace = event.key === "Backspace";
+            setShowWarn(false);
             if (hasSelection && isBackspace) {
                 if (!isDel) {
                     setIsIns(false);
@@ -83,20 +100,19 @@ export default function EditableSeqViz() {
                 let selEnd = Math.max(selection.start, selection.end);
                 let selLen = selEnd - selStart;
                 if (selLen === 0) {
-                    setSequence((sequence) => sequence.substring(0, selStart - 1) +
-                                              sequence.substring(selStart));
+                    setSequence(sequence.substring(0, selStart - 1) +
+                                sequence.substring(selStart));
                     setSelection({ ...selection,
                                    start: selStart - 1,
                                    end: selStart - 1 });
                 } else {
-                    setSequence((sequence) => sequence.substring(0, selStart) +
-                                              sequence.substring(selEnd));
+                    setSequence(sequence.substring(0, selStart) +
+                                sequence.substring(selEnd));
                     setSelection({ ...selection,
                                    start: selStart,
                                    end: selStart });
                 }
             } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
-                console.log("ctrl + Z")
                 setIsIns(false);
                 setIsDel(false);
                 popUndoStack();
@@ -123,16 +139,16 @@ export default function EditableSeqViz() {
                 let selEnd = Math.max(selection.start, selection.end);
                 let selLen = selEnd - selStart;
                 if (selLen === 0) {
-                    setSequence((sequence) => sequence.substring(0, selStart) +
-                                              processedText +
-                                              sequence.substring(selStart));
+                    setSequence(sequence.substring(0, selStart) +
+                                processedText +
+                                sequence.substring(selStart));
                     setSelection({ ...selection,
                                  start: selStart,
                                  end: selStart + processedText.length });
                 } else {
-                    setSequence((sequence) => sequence.substring(0, selStart) +
-                                              processedText +
-                                              sequence.substring(selEnd));
+                    setSequence(sequence.substring(0, selStart) +
+                                processedText +
+                                sequence.substring(selEnd));
                     setSelection({ ...selection,
                                    start: selStart,
                                    end: selStart + processedText.length });
@@ -148,22 +164,133 @@ export default function EditableSeqViz() {
             window.removeEventListener("keydown", keydownHandler);
             window.removeEventListener("paste", pasteHandler);
         };
-    }, [sequence, selection, isIns, isDel, undoStack]);
+    }, [isEditable, seqData.seq, selection, isIns, isDel, undoStack]);  // eslint-disable-line
 
-    let props = { name: "Test", viewer: "linear", seq: sequence };
+    // MANAGE CDS'S
+    useEffect(() => {
+        // Check if selection is a range
+        if (selection.start === null || selection.start === selection.end) {
+            setShowAddCDS(false);
+            setShowCDSCtrls(false);
+            return;
+        }
+        // Check if selection overlaps with any other CDS
+        const selStart = Math.min(selection.start, selection.end);
+        const selEnd = Math.max(selection.start, selection.end);
+        let hasOverlap = seqData.cdsList.some(cds => (selStart <= cds.end &&
+                                                      selEnd >= cds.start ))  // The Ilias trick
+        const selToCDS = new Map(seqData.cdsList.map((cds, i) => [String([cds.start, cds.end]), i]));
+        const selIndex = selToCDS.get(String([selStart, selEnd]));
+        if (selIndex !== undefined) {
+            setShowAddCDS(false);
+            setShowCDSCtrls(true);
+            setCurrCDS(selIndex);
+        } else if (!hasOverlap) {
+            setShowAddCDS(true);
+            setShowCDSCtrls(false);
+            setCurrCDS(null);
+        } else {
+            setShowAddCDS(false);
+            setShowCDSCtrls(false);
+            setCurrCDS(null);
+        }
+    }, [seqData.cdsList, selection]);
+    const handleAddCDS = () => {
+        const selStart = Math.min(selection.start, selection.end);
+        const selEnd = Math.max(selection.start, selection.end);
+        const newCDS = { name: "CDS",
+                         start: selStart,
+                         end: selEnd,
+                         direction: (selection.clockwise ? "+" : "-"),
+                         frame: 0 };
+        setSeqData((prevSeqData) => ({ ...prevSeqData,
+                                       cdsList: [...prevSeqData.cdsList, newCDS]}));
+    };
+    const handleDelCDS = () => {
+        if (currCDS === undefined) { return; }
+        setSeqData((prevSeqData) => {
+            let cdsList = prevSeqData.cdsList;
+            cdsList.splice(currCDS, 1);
+            return { ...prevSeqData,
+                     cdsList: cdsList };
+        });
+    };
+    const handleShiftLeft = () => {
+        if (currCDS === undefined || seqData.cdsList[currCDS] === undefined) { return; }
+        const offset = seqData.cdsList[currCDS].direction === "+" ? 1 : 2
+        setSeqData((prevSeqData) => {
+            let cdsList = prevSeqData.cdsList;
+            cdsList[currCDS].frame = (cdsList[currCDS].frame + offset) % 3;
+            return { ...prevSeqData,
+                     cdsList: cdsList }
+        });
+    };
+    const handleFlip = () => {
+        if (currCDS === undefined || seqData.cdsList[currCDS] === undefined) { return; }
+        setSeqData((prevSeqData) => {
+            let cdsList = prevSeqData.cdsList;
+            cdsList[currCDS].direction = cdsList[currCDS].direction === "+" ? "-" : "+";
+            return { ...prevSeqData,
+                     cdsList: cdsList }
+        });
+    };
+    const handleShiftRight = () => {
+        if (currCDS === undefined || seqData.cdsList[currCDS] === undefined) { return; }
+        const offset = seqData.cdsList[currCDS].direction === "+" ? 2 : 1
+        setSeqData((prevSeqData) => {
+                    let cdsList = prevSeqData.cdsList;
+                    cdsList[currCDS].frame = (cdsList[currCDS].frame + offset) % 3;
+                    return { ...prevSeqData,
+                             cdsList: cdsList }
+        });
+    };
+
+    // TURN CDS => ANNOTATIONS/TRANSLATIONS
+    useEffect(() => {
+        const cdsAandTs = seqData.cdsList.map(cds => makeCDSAandTs(cds));
+        const cdsAnnotations = cdsAandTs.map(cds => cds.annotation);
+        const cdsTranslations = cdsAandTs.map(cds => cds.translation);
+        setAnnotations([...seqData.annotations, ...cdsAnnotations]);
+        setTranslations([...seqData.translations, ...cdsTranslations]);
+    }, [seqData]);
 
     return (
-        <div style={{ height: '500px', width: '100%', position: 'relative',
-                      display: 'block', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-            {showWarn && <div className="warn-paste" style={{ width: '100%', display: 'block' }}>
+        <div style={{ height: "100%", verticalAlign: "top" }}>
+            <div style={{ height: "120px", width: "100%", display: "block", marginBottom: "25px" }}>
+                <SeqViz
+                    { ...seqData }
+                    viewer="linear"
+                    selection={selection}
+                    annotations={annotations}
+                    translations={translations}
+                    onSelection={setSelection}
+                />
+            </div>
+            { showWarn &&
+            <div className="warn-paste" style={{ width: "100%", display: "block" }}>
                 <p>Paste data contained non-ACGT characters! Please check: {pasteData}</p>
+            </div> }
+            { showAddCDS &&
+            <div style={{ width: "100%" }}>
+                <button
+                    id="add-cds"
+                    onClick={handleAddCDS}
+                >Add CDS</button>
+            </div> }
+            { showCDSCtrls &&
+            <div style={{ width: "100%" }}>
+                <button onClick={handleShiftLeft}>←</button>
+                <button onClick={handleFlip}>
+                    {seqData.cdsList[currCDS] && seqData.cdsList[currCDS].direction === "+"
+                     ? '\u21a9' : '\u21aa'}
+                </button>
+                <button onClick={handleShiftRight}>→</button>
+                <br />
+                <button
+                    id="del-cds"
+                    onClick={handleDelCDS}
+                >Delete CDS</button>
             </div>}
-            <SeqViz
-                { ...props }
-                sequence={sequence}
-                selection={selection}
-                onSelection={selectionHandler}
-            />
         </div>
-    )
+    );
 }
