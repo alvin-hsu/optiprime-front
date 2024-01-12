@@ -237,11 +237,6 @@ function Step3({ handleStep, data, setData }) {
                     setSeqData={setUneditedData}
                 />
             </div>
-            <br />
-            {uneditedData.seq === "" &&
-            <p>
-                (start typing...)
-            </p>}
             <div>
                 <button onClick={handleSubmit}>Save Changes</button>
             </div>

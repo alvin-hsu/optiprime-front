@@ -7,9 +7,10 @@ import { makeCDSAandTs } from "./Utils";
 const MAX_UNDO_STACK = 64;
 
 export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
-    const [selection, setSelection] = useState(seqData.seq === "" ?
-                                               {clockwise: true, start: 0, end: 0} :
-                                               {clockwise: true, start: NaN, end: NaN});
+    const [editEnabled, setEditEnabled] = useState(false);
+    const [selection, setSelection] = useState(seqData.seq === ""
+                                               ? {clockwise: true, start: 0, end: 0}
+                                               : {clockwise: true, start: NaN, end: NaN});
     // PASTE FUNCTIONALITY
     const [pasteData, setPasteData] = useState("");
     const [showWarn, setShowWarn] = useState(false);
@@ -27,14 +28,13 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
 
     // MANAGE SEQUENCE EDITING FUNCTIONALITY
     useEffect(() => {
-        if (!isEditable) { return; }
+        if (!editEnabled) { return; }
         const sequence = seqData.seq;
         const setSequence = (newSeq) => {
             setSeqData((prevSeqData) => ({ ...prevSeqData, seq: newSeq }));
         };
         // Managing the undoStack
         const pushUndoStack = () => {
-            console.log(undoStack);
             setUndoStack((prevUndoStack) => {
                 if (prevUndoStack.length === MAX_UNDO_STACK) {
                     prevUndoStack = prevUndoStack.slice(1)
@@ -44,7 +44,6 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
             });
         };
         const popUndoStack = () => {
-            console.log(undoStack);
             if (undoStack.length > 0) {
                 const item = undoStack[undoStack.length - 1];
                 setUndoStack(prevUndoStack => prevUndoStack.slice(0, undoStack.length - 1));
@@ -56,7 +55,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
         };
         // Actually handling editing events
         const keypressHandler = (event) => {
-            let hasSelection = selection.start !== null;
+            let hasSelection = !isNaN(selection.start);
             let keyUpper = event.key.toUpperCase();
             let isBase = "ACGT".includes(keyUpper);
             setShowWarn(false);
@@ -164,21 +163,36 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
             window.removeEventListener("keydown", keydownHandler);
             window.removeEventListener("paste", pasteHandler);
         };
-    }, [isEditable, seqData.seq, selection, isIns, isDel, undoStack]);  // eslint-disable-line
+    }, [editEnabled, seqData.seq, selection, isIns, isDel, undoStack]);  // eslint-disable-line
 
     // IF NOT EDITABLE, DISABLE SELECTION
     const selectionHandler = (userSelection) => {
-        if (!isEditable) {
+        if (!editEnabled) {
             setSelection({ clockwise: true, start: NaN, end: NaN });
         } else {
+            console.log(userSelection);
             setSelection(userSelection);
         }
     };
 
+    // TOGGLE EDITING
+    const toggleEditing = () => {
+        setEditEnabled(oldState => {
+            if (!oldState) {
+                setSelection(seqData.seq === ""
+                             ? { clockwise: true, start: 0, end: 0 }
+                             : { clockwise: true, start: NaN, end: NaN });
+            } else {
+                setSelection({ clockwise: true, start: NaN, end: NaN });
+            }
+            return isEditable && !oldState
+        });
+    }
+
     // MANAGE CDS'S
     useEffect(() => {
         // Check if selection is a range
-        if (!isEditable || selection.start === null || selection.start === selection.end) {
+        if (!editEnabled || !selection.start || selection.start === selection.end) {
             setShowAddCDS(false);
             setShowCDSCtrls(false);
             return;
@@ -203,7 +217,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
             setShowCDSCtrls(false);
             setCurrCDS(null);
         }
-    }, [isEditable, seqData, selection]);
+    }, [editEnabled, seqData.cdsList, selection]);
     const handleAddCDS = () => {
         const selStart = Math.min(selection.start, selection.end);
         const selEnd = Math.max(selection.start, selection.end);
@@ -266,6 +280,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
     return (
         <div style={{ height: "100%", verticalAlign: "top" }}>
             <div style={{ height: "135px", width: "100%", display: "block", marginBottom: "25px" }}>
+                {seqData.seq !== "" &&  // Because SeqViz refuses to update when seq is ""
                 <SeqViz
                     { ...seqData }
                     viewer="linear"
@@ -273,21 +288,29 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
                     annotations={annotations}
                     translations={translations}
                     onSelection={selectionHandler}
-                />
+                />}
             </div>
+            {isEditable &&
+            <div>
+                <button
+                    onClick={toggleEditing}
+                    style={{border: "1px solid #000000",
+                            borderRadius: "4px",
+                            color: "#000000",
+                            backgroundColor : editEnabled ? "#A0A0A0" : "#F0F0F0" }}
+                >{"\u270e Allow editing"}</button>
+            </div>
+            }
             { showWarn &&
             <div className="warn-paste" style={{ width: "100%", display: "block" }}>
                 <p>Paste data contained non-ACGT characters! Please check: {pasteData}</p>
             </div> }
             { showAddCDS &&
-            <div style={{ width: "100%" }}>
-                <button
-                    id="add-cds"
-                    onClick={handleAddCDS}
-                >Add CDS</button>
+            <div>
+                <button onClick={handleAddCDS}>Add CDS</button>
             </div> }
             { showCDSCtrls &&
-            <div style={{ width: "100%" }}>
+            <div>
                 <button onClick={handleShiftLeft}>←</button>
                 <button onClick={handleFlip}>
                     {seqData.cdsList[currCDS] && seqData.cdsList[currCDS].direction === "+"
@@ -295,11 +318,12 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
                 </button>
                 <button onClick={handleShiftRight}>→</button>
                 <br />
-                <button
-                    id="del-cds"
-                    onClick={handleDelCDS}
-                >Delete CDS</button>
+                <button onClick={handleDelCDS}>Delete CDS</button>
             </div>}
+            {seqData.seq === "" && editEnabled &&
+            <p>
+                (start typing...)
+            </p>}
         </div>
     );
 }
