@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { SeqViz } from "seqviz";
-import { SwitchField } from "@aws-amplify/ui-react";
+import { Button, SwitchField, Text } from "@aws-amplify/ui-react";
 
 import { makeCDSAandTs } from "./Utils";
 
@@ -8,7 +8,7 @@ import { makeCDSAandTs } from "./Utils";
 const MAX_UNDO_STACK = 64;
 
 export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
-    const [editEnabled, setEditEnabled] = useState(false);
+    const [editEnabled, setEditEnabled] = useState(seqData.seq !== "");
     const [selection, setSelection] = useState(seqData.seq === ""
                                                ? {clockwise: true, start: 0, end: 0}
                                                : {clockwise: true, start: NaN, end: NaN});
@@ -280,7 +280,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
 
     return (
         <div style={{ height: "100%", verticalAlign: "top" }}>
-            <div style={{ height: "135px", width: "100%", display: "block", marginBottom: "25px" }}>
+            <div style={{ height: "150px", width: "100%", display: "block", marginBottom: "25px" }}>
                 {seqData.seq !== "" &&  // Because SeqViz refuses to update when seq is ""
                 <SeqViz
                     { ...seqData }
@@ -295,37 +295,34 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
             <div>
                 <SwitchField
                     label="Allow editing"
-                    onClick={toggleEditing}
-                    style={{border: "1px solid #000000",
-                            borderRadius: "4px",
-                            color: "#000000",
-                            backgroundColor : editEnabled ? "#A0A0A0" : "#F0F0F0" }}
+                    isChecked={editEnabled}
+                    onChange={toggleEditing}
                 />
             </div>
             }
             { showWarn &&
             <div className="warn-paste" style={{ width: "100%", display: "block" }}>
-                <p>Paste data contained non-ACGT characters! Please check: {pasteData}</p>
+                <Text>Paste data contained non-ACGT characters! Please check: {pasteData}</Text>
             </div> }
             { showAddCDS &&
             <div>
-                <button onClick={handleAddCDS}>Add CDS</button>
+                <Button onClick={handleAddCDS}>Add CDS</Button>
             </div> }
             { showCDSCtrls &&
             <div>
-                <button onClick={handleShiftLeft}>←</button>
-                <button onClick={handleFlip}>
+                <Button onClick={handleShiftLeft}>←</Button>
+                <Button onClick={handleFlip}>
                     {seqData.cdsList[currCDS] && seqData.cdsList[currCDS].direction === "+"
                      ? '\u21a9' : '\u21aa'}
-                </button>
-                <button onClick={handleShiftRight}>→</button>
+                </Button>
+                <Button onClick={handleShiftRight}>→</Button>
                 <br />
-                <button onClick={handleDelCDS}>Delete CDS</button>
+                <Button onClick={handleDelCDS}>Delete CDS</Button>
             </div>}
             {seqData.seq === "" && editEnabled &&
-            <p>
+            <Text>
                 (start typing...)
-            </p>}
+            </Text>}
         </div>
     );
 }

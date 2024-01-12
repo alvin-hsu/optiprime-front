@@ -1,6 +1,7 @@
 import React from "react";
-import { SwitchTransition, CSSTransition } from 'react-transition-group';
+import { SwitchTransition, CSSTransition } from "react-transition-group";
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
+import "@aws-amplify/ui-react/styles.css";
 
 import About from "./About"
 import Design from "./Design"

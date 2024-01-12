@@ -1,8 +1,9 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import "./Utils.css"
+import { Button } from "@aws-amplify/ui-react";
 
 export default function Home() {
+    // TODO: LocalStorage to store previous predictions
     let navigate = useNavigate();
 
     const goToDesign = () => {
@@ -11,9 +12,9 @@ export default function Home() {
 
     return (
         <div>
-          <button onClick={goToDesign} style={{ fontSize: "24px", padding: "10px" }}>
+          <Button onClick={goToDesign}>
               Start designing!
-          </button>
+          </Button>
         </div>
     );
 }

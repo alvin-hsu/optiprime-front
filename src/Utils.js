@@ -20,11 +20,36 @@ export const rsIDtoHg38Coords = (rsID) => {
                     }
                 }
                 if (typeof trueIdx === "undefined") {
-                    throw new Error("Could not find rsID in dbSNP");
+                    throw new Error("Could not find rsID in dbSNP. Please enter genomic " +
+                                    "coordinates instead.");
                 }
                 return data[3][trueIdx];
             });
-}
+};
+
+export const fetchUCSCGenomes = () => {
+    return fetch("https://api.genome.ucsc.edu/list/ucscGenomes")
+           .then(resp => {
+               if (!resp.ok) {
+                   throw new Error("Failed to fetch list of UCSC genomes. Please enter the " +
+                                   "sequence you want to edit manually.");
+               }
+               return resp.json(); })
+           .then(data => {
+               let byTaxId = {};
+               for (const [genomeName, genomeData] of Object.entries(data["ucscGenomes"])) {
+                   const taxId = genomeData["taxId"];
+                   if (!(taxId in byTaxId)) {
+                       byTaxId[taxId] = { name: genomeData["organism"],
+                                          scientificName: genomeData["scientificName"],
+                                          genomes: []};
+                   }
+                   byTaxId[taxId].genomes = [...byTaxId[taxId].genomes, genomeName];
+               }
+               console.log(byTaxId);
+               return byTaxId;
+           });
+};
 
 export const coordsToRefSeq = (coords) => {
    const query = ("genome=" + coords.assembly + ";" +
@@ -45,7 +70,7 @@ export const coordsToRefSeq = (coords) => {
             .then(data => {
                 return data['ncbiRefSeq'][0];
             });
-}
+};
 
 export const fetchSequenceFromCoords = async (coords, contextLen) => {
     try {
@@ -183,7 +208,7 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
     }
     // console.log("Context Exons:", contextExons);
     return contextExons;
-}
+};
 
 /*
  * Make *A*nnotations and *T*ranslation props for a given CDS, as annotated from
@@ -215,4 +240,4 @@ export const makeCDSAandTs = ({ name, start, end, direction, frame }) => {
         annotation: annotation,
         translation: translation
     };
-}
+};
