@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { SeqViz } from "seqviz";
+import { SwitchField } from "@aws-amplify/ui-react";
 
 import { makeCDSAandTs } from "./Utils";
 
@@ -292,13 +293,14 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
             </div>
             {isEditable &&
             <div>
-                <button
+                <SwitchField
+                    label="Allow editing"
                     onClick={toggleEditing}
                     style={{border: "1px solid #000000",
                             borderRadius: "4px",
                             color: "#000000",
                             backgroundColor : editEnabled ? "#A0A0A0" : "#F0F0F0" }}
-                >{"\u270e Allow editing"}</button>
+                />
             </div>
             }
             { showWarn &&
