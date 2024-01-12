@@ -271,7 +271,7 @@ const Organism = ({ handleStep, data, setData }) => {
  * - rs782665893 -> exon (CDS), C>T (DNA) V>M (protein). Gene goes in - strand
  * - rs113993960 -> exon (CDS), TCTT>T (or delTCT or delCTT) (DNA), del F (protein). Gene goes in + strand
  */
-function Unedited({ handleStep, data, setData }) {
+const Unedited = ({ handleStep, data, setData }) => {
     const [uneditedData, setUneditedData] = useState("unedited" in data ? data.unedited :
                                                      { seq: "",
                                                        cdsList: [],
@@ -372,7 +372,7 @@ function Unedited({ handleStep, data, setData }) {
  * if you're not in an exon. 
  * 
  */ 
-function Edited({data, handleStep, setData}) {
+const Edited = ({data, handleStep, setData}) => {
     // TODO: Update edited with rsID if present
     // TODO: Alignment for highlighting
     // TODO: Switch unedited/edited
@@ -409,24 +409,7 @@ function Edited({data, handleStep, setData}) {
             </div>
         </>
     );
-}
-
-function Step5({data, handleStep, setData}) {
-    console.log("Step 5", data);
-    return <div>Step5</div>
-}
-
-
-/* Step 6 - Talk to the model
- * 
- * Pass the information to the model for processing, fetch the result and tell the user what 
- * the best edits are.
- * 
- */
-function Step6({data, handleStep, setData}) {
-    console.log(data);
-    return <div>Step6</div>
-}
+};
 
 
 export default function Design() {

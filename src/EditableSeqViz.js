@@ -8,7 +8,7 @@ import { makeCDSAandTs } from "./Utils";
 const MAX_UNDO_STACK = 64;
 
 export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
-    const [editEnabled, setEditEnabled] = useState(seqData.seq !== "");
+    const [editEnabled, setEditEnabled] = useState(seqData.seq === "");
     const [selection, setSelection] = useState(seqData.seq === ""
                                                ? {clockwise: true, start: 0, end: 0}
                                                : {clockwise: true, start: NaN, end: NaN});
