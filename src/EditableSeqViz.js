@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { SeqViz } from "seqviz";
 import { Button, SwitchField, Text } from "@aws-amplify/ui-react";
 
-import { makeCDSAandTs } from "./Utils";
+import { makeCDSAandTs, updateCDS } from "./Utils";
 
 
 const MAX_UNDO_STACK = 64;
@@ -32,7 +32,15 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
         if (!editEnabled) { return; }
         const sequence = seqData.seq;
         const setSequence = (newSeq) => {
-            setSeqData((prevSeqData) => ({ ...prevSeqData, seq: newSeq }));
+            setSeqData(prevSeqData => ({ ...prevSeqData, seq: newSeq }));
+        };
+        const updateCDSList = (selection, delta) => {
+            setSeqData(prevSeqData => ({
+                ...prevSeqData,
+                cdsList: prevSeqData.cdsList
+                                     .map(cds => updateCDS(cds, selection, delta))
+                                     .filter(cds => !!cds)
+            }));
         };
         // Managing the undoStack
         const pushUndoStack = () => {
@@ -40,8 +48,9 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
                 if (prevUndoStack.length === MAX_UNDO_STACK) {
                     prevUndoStack = prevUndoStack.slice(1)
                 }
-                return [...prevUndoStack, {oldSequence: sequence,
-                                           oldSelection: selection}]
+                return [...prevUndoStack, { oldSequence: sequence,
+                                            oldSelection: selection,
+                                            oldCDSList: seqData.cdsList }]
             });
         };
         const popUndoStack = () => {
@@ -50,6 +59,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
                 setUndoStack(prevUndoStack => prevUndoStack.slice(0, undoStack.length - 1));
                 setSequence(item.oldSequence);
                 setSelection(item.oldSelection);
+                setSeqData(prevSeqData => ({ ...prevSeqData, cdsList: item.oldCDSList }));
             }
             setIsIns(false);
             setIsDel(false);
@@ -76,6 +86,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
                     setSelection({ ...selection,
                                  start: selStart + 1,
                                  end: selEnd + 1 });
+                    updateCDSList(selection, 1);
                 } else {
                     setSequence(sequence.substring(0, selStart) +
                                 keyUpper +
@@ -83,6 +94,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
                     setSelection({ ...selection,
                                    start: selStart + 1,
                                    end: selStart + 1 });
+                    updateCDSList(selection, selStart - selEnd + 1);
                 }
             }
         };
@@ -105,12 +117,14 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
                     setSelection({ ...selection,
                                    start: selStart - 1,
                                    end: selStart - 1 });
+                    updateCDSList({ ...selection, start: selStart - 1}, -1);
                 } else {
                     setSequence(sequence.substring(0, selStart) +
                                 sequence.substring(selEnd));
                     setSelection({ ...selection,
                                    start: selStart,
                                    end: selStart });
+                    updateCDSList(selection, selStart - selEnd);
                 }
             } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
                 setIsIns(false);
@@ -138,21 +152,13 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
                 let selStart = Math.min(selection.start, selection.end);
                 let selEnd = Math.max(selection.start, selection.end);
                 let selLen = selEnd - selStart;
-                if (selLen === 0) {
-                    setSequence(sequence.substring(0, selStart) +
-                                processedText +
-                                sequence.substring(selStart));
-                    setSelection({ ...selection,
-                                 start: selStart,
-                                 end: selStart + processedText.length });
-                } else {
-                    setSequence(sequence.substring(0, selStart) +
-                                processedText +
-                                sequence.substring(selEnd));
-                    setSelection({ ...selection,
-                                   start: selStart,
-                                   end: selStart + processedText.length });
-                }
+                setSequence(sequence.substring(0, selStart) +
+                            processedText +
+                            sequence.substring(selStart));
+                setSelection({ ...selection,
+                             start: selStart,
+                             end: selStart + processedText.length });
+                updateCDSList(selection, processedText.length - selLen);
             }
         };
         // Put in handlers
@@ -164,7 +170,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
             window.removeEventListener("keydown", keydownHandler);
             window.removeEventListener("paste", pasteHandler);
         };
-    }, [editEnabled, seqData.seq, selection, isIns, isDel, undoStack]);  // eslint-disable-line
+    }, [editEnabled, seqData.seq, seqData.cdsList, selection, isIns, isDel, undoStack]);  // eslint-disable-line
 
     // IF NOT EDITABLE, DISABLE SELECTION
     const selectionHandler = (userSelection) => {
@@ -188,7 +194,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
             }
             return isEditable && !oldState
         });
-    }
+    };
 
     // MANAGE CDS'S
     useEffect(() => {

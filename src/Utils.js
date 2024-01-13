@@ -257,3 +257,42 @@ export const minEdit = (unedited, edited) => {
     }
     return { min_u: unedited, min_e: edited, pre_len: i, post_len: j };
 };
+
+/*
+ * Update CDS objects based on a selection and the change in length.
+ */
+export const updateCDS = (cds, selection, delta) => {
+    if (selection.start <= cds.start) {
+        if (selection.end < cds.start) {
+            return { ...cds,
+                     start: cds.start + delta,
+                     end: cds.end + delta };
+        } else if (selection.end >= cds.end) {
+            return null;
+        } else {
+            const selLen = selection.end - selection.start;
+            const newStart = selection.start + selLen + delta;
+            const newFrame = cds.direction === "+"
+                             ? (cds.frame + cds.start - newStart) % 3
+                             : cds.frame;
+            return { ...cds,
+                     start: newStart,
+                     end: cds.end + delta,
+                     frame: newFrame };
+        }
+    } else if (selection.start < cds.end) {
+        if (selection.end < cds.end ) {
+            return { ...cds,
+                     end: cds.end + delta }
+        } else {
+            const newFrame = cds.direction === "+"
+                             ? cds.frame
+                             : (cds.frame + cds.end - selection.start) % 3;
+            return { ...cds,
+                     end: selection.start,
+                     frame: newFrame };
+        }
+    } else {
+        return { ...cds };
+    }
+};
