@@ -298,8 +298,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
                     isChecked={editEnabled}
                     onChange={toggleEditing}
                 />
-            </div>
-            }
+            </div>}
             { showWarn &&
             <div className="warn-paste" style={{ width: "100%", display: "block" }}>
                 <Text>Paste data contained non-ACGT characters! Please check: {pasteData}</Text>

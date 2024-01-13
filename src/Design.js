@@ -28,8 +28,10 @@ const Start = ({ handleStep, data, setData }) => {
 const RsID = ({ handleStep, data, setData }) => {
     const [rsID, setRsID] = useState("rsID" in data ? data.rsID : "");
     const [loadingText, setLoadingText] = useState("");
+    const [validInput, setValidInput] = useState("rsID" in data);
     const handleInputChange = (event) => {
-        const newRsId = event.target.value.replace(/\D/g, "")
+        const newRsId = event.target.value.replace(/\D/g, "");
+        if (newRsId) { setValidInput(true); }
         setRsID("rs" + newRsId);
     };
     const handleSubmit = () => {
@@ -43,10 +45,11 @@ const RsID = ({ handleStep, data, setData }) => {
                                              pos: entry[2] },
                                    gene: entry[3],
                                    alleles: entry[4] }));
-        }).finally(() => {
+        }).then(() => {
             handleStep(1, 4);
         }).catch(error => {
-            console.error(error);  // TODO: Better error message
+            setLoadingText(error.toString());
+            setValidInput(false);
         });
     };
     return (
@@ -58,9 +61,10 @@ const RsID = ({ handleStep, data, setData }) => {
                 placeholder="rs#####"
                 style={{ width: "200px" }}
             />
-            <Button onClick={handleSubmit}>Submit</Button>
-            <Button onClick={() => handleStep(1, 2)}>No</Button>
             <div>{loadingText}</div>
+            {validInput &&
+            <Button onClick={handleSubmit}>Submit</Button>}
+            <Button onClick={() => handleStep(1, 2)}>No</Button>
         </div>
     );
 };
@@ -165,7 +169,11 @@ const Organism = ({ handleStep, data, setData }) => {
                               label: taxIdData.name + ` [${taxIdData.scientificName}, taxID: ${taxId}]`}]
             }
             setOrganisms(organisms);
-        }).then(() => {setLoadingText("");});
+        }).finally(() => {
+            setLoadingText("");
+        }).catch(error => {
+            setLoadingText(error.toString());
+        });
     }, []);
 
     const handleInputChange = (event) => {
@@ -278,7 +286,6 @@ const Unedited = ({ handleStep, data, setData }) => {
                                                        annotations: [],
                                                        translations: [] });
     const [loadingText, setLoadingText] = useState("");
-    const [txDirection, setTxDirection] = useState("+");
 
     // GET SEQUENCE WITH CONTEXT AND TRANSLATION
     useEffect(() => {
@@ -292,36 +299,21 @@ const Unedited = ({ handleStep, data, setData }) => {
                 setLoadingText("");
             })
             .catch(error => {
-                console.error("Error fetching seq:", error);  // FIXME: Add a better error
+                setLoadingText("Error fetching coordinates: " + error.toString());
             });
         // Fetch reference and determine position
         coordsToRefSeq(data.coords)
+            .catch(error => {
+                setLoadingText("Error fetching annotations: " + error.toString());
+            })
             .then(refSeq => {
-                console.log(refSeq);
-                setTxDirection(refSeq["strand"]);
                 const contextExons = getContextExonTranslations(refSeq,
                                                                 data.coords.pos,
                                                                 _CONTEXT_LEN);
                 setUneditedData(u => ({ ...u, cdsList: contextExons }));
             })
-            .catch(error => {
-                console.error("Error fetching refSeq:", error);  // FIXME: Add a better error
-            });
+            .catch(_ => {});
     }, [data.coords]); // Only rerun the effect if data.coords changes
-
-    // // HIGHLIGHT MUTATION IF GIVEN AS RSID
-    // useEffect(() => {
-    //     if (!data.alleles) { return; }
-    //     const uneditedLen = data.alleles.split("/")[0].length;
-    //     const newAnnotation = {
-    //         name: data.rsID,
-    //         start: _CONTEXT_LEN,
-    //         end: _CONTEXT_LEN + uneditedLen,
-    //         direction: txDirection === "+" ? 1 : -1,
-    //         color: "blue",
-    //     };
-    //     setUneditedData(u => ({ ...u, annotations: [newAnnotation] }));
-    // }, [data.rsID, data.alleles, txDirection]);
 
     const handleSubmit = () => {
         console.log("updating unedited data...");
