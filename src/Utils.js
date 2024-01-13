@@ -255,7 +255,7 @@ export const minEdit = (unedited, edited) => {
         unedited = unedited.slice(0, -j);
         edited = edited.slice(0, -j);
     }
-    return { min_u: unedited, min_e: edited, pre_len: i, post_len: j };
+    return { minU: unedited, minE: edited, preLen: i, postLen: j };
 };
 
 /*

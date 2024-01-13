@@ -7,7 +7,9 @@ import {
     fetchSequenceFromCoords,
     coordsToRefSeq,
     getContextExonTranslations,
-    fetchUCSCGenomes, minEdit
+    fetchUCSCGenomes,
+    minEdit,
+    updateCDS
 }
     from "./Utils";
 import EditableSeqViz from "./EditableSeqViz";
@@ -15,7 +17,7 @@ import EditableSeqViz from "./EditableSeqViz";
 
 const _CONTEXT_LEN = 50;
 
-const Start = ({ handleStep, data, setData }) => {
+const Start = ({ handleStep }) => {
     return (
         <div>
             <Text>Is the genotype you want to edit from the human genome?</Text>
@@ -366,7 +368,6 @@ const Unedited = ({ handleStep, data, setData }) => {
  * 
  */ 
 const Edited = ({data, handleStep, setData}) => {
-    // TODO: Switch unedited/edited
     const [uneditedData, setUneditedData] = useState(data.unedited);
     const [editedData, setEditedData] = useState(data.unedited);
     const [warningMsg, setWarningMsg] = useState("")
@@ -381,25 +382,32 @@ const Edited = ({data, handleStep, setData}) => {
         if (!data.alleles) { return; }
         const [minU, minE] = data.alleles.split("/");
         const uLen = minU.length;
+        const eLen = minE.length;
         const uSeq = uneditedData.seq;
         const eSeq = uSeq.substring(0, _CONTEXT_LEN) + minE + uSeq.substring(_CONTEXT_LEN + uLen);
-        setEditedData(e => ({ ...e, seq: eSeq }));
+        const newCDSList = uneditedData.cdsList
+                                        .map(cds => updateCDS(cds,
+                                                              { start: _CONTEXT_LEN,
+                                                                end: _CONTEXT_LEN + uLen },
+                                                              eLen - uLen))
+                                        .filter(cds => !!cds);
+        setEditedData(e => ({ ...e, seq: eSeq, cdsList: newCDSList }));
     }, []);  // eslint-disable-line
 
     // HIGHLIGHT CHANGE
     useEffect(() => {
-        const {min_u, min_e, pre_len} = minEdit(uneditedData.seq, editedData.seq);
+        const {minU, minE, preLen} = minEdit(uneditedData.seq, editedData.seq);
         let color = "black";
         setWarningMsg("");
-        if (min_u.length === 0 && min_e.length === 0) { setWarningMsg("No edit specified!"); }
-        else if (min_u.length === 0) { color = "lime"; }
-        else if (min_e.length === 0) { color = "pink"; }
+        if (minU.length === 0 && minE.length === 0) { setWarningMsg("No edit specified!"); }
+        else if (minU.length === 0) { color = "lime"; }
+        else if (minE.length === 0) { color = "pink"; }
         else { color = "cyan"; }
-        const uHighlight = { start: pre_len, end: pre_len + min_u.length, color: color };
-        const eHighlight = { start: pre_len, end: pre_len + min_e.length, color: color };
-        if (min_u.length > 0) { setUneditedData(u => ({ ...u, highlights: [uHighlight] })); }
+        const uHighlight = { start: preLen, end: preLen + minU.length, color: color };
+        const eHighlight = { start: preLen, end: preLen + minE.length, color: color };
+        if (minU.length > 0) { setUneditedData(u => ({ ...u, highlights: [uHighlight] })); }
         else { setUneditedData(u => ({ ...u, highlights: [] })); }
-        if (min_e.length > 0) { setEditedData(e => ({ ...e, highlights: [eHighlight] })); }
+        if (minE.length > 0) { setEditedData(e => ({ ...e, highlights: [eHighlight] })); }
         else { setEditedData(e => ({ ...e, highlights: [] })); }
     }, [uneditedData.seq, editedData.seq]);
 

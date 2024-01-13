@@ -133,7 +133,6 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
             }
         };
         const pasteHandler = (event) => {
-            console.log(event)
             let hasSelection = selection.start !== null;
             let clipboardText = event.clipboardData.getData('Text');
             clipboardText = clipboardText.replace(/\s+/g, "")
