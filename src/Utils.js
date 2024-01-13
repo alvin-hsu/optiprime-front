@@ -241,3 +241,23 @@ export const makeCDSAandTs = ({ name, start, end, direction, frame }) => {
         translation: translation
     };
 };
+
+/*
+ * Find indices for minimal unedited/edited sequences.
+ */
+export const minEdit = (unedited, edited) => {
+    let i, j;
+    for (i = 0; i < unedited.length && i < edited.length; i++) {
+        if (unedited[i] !== edited[i]) { break; }
+    }
+    unedited = unedited.slice(i);
+    edited = edited.slice(i);
+    for (j = 0; j < unedited.length && j < edited.length; j++) {
+        if (unedited[unedited.length - 1 - j] !== edited[edited.length - 1 - j]) { break; }
+    }
+    if (j) {
+        unedited = unedited.slice(0, -j);
+        edited = edited.slice(0, -j);
+    }
+    return { min_u: unedited, min_e: edited, pre_len: i, post_len: j };
+};

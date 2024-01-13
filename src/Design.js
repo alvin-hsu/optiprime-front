@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useSpring, animated } from "react-spring";
-import { Autocomplete, Button, Input, SelectField, Text } from "@aws-amplify/ui-react";
+import {Alert, Autocomplete, Button, Input, SelectField, Text} from "@aws-amplify/ui-react";
 
 import {
     rsIDtoHg38Coords,
     fetchSequenceFromCoords,
     coordsToRefSeq,
     getContextExonTranslations,
-    fetchUCSCGenomes
+    fetchUCSCGenomes, minEdit
 }
     from "./Utils";
 import EditableSeqViz from "./EditableSeqViz";
@@ -309,19 +309,19 @@ const Unedited = ({ handleStep, data, setData }) => {
             });
     }, [data.coords]); // Only rerun the effect if data.coords changes
 
-    // HIGHLIGHT MUTATION IF GIVEN AS RSID
-    useEffect(() => {
-        if (!data.alleles) { return; }
-        const uneditedLen = data.alleles.split('/')[0].length;
-        const newAnnotation = {
-            name: data.rsID,
-            start: _CONTEXT_LEN,
-            end: _CONTEXT_LEN + uneditedLen,
-            direction: txDirection === "+" ? 1 : -1,
-            color: "blue",
-        };
-        setUneditedData(u => ({ ...u, annotations: [newAnnotation] }));
-    }, [data.rsID, data.alleles, txDirection]);
+    // // HIGHLIGHT MUTATION IF GIVEN AS RSID
+    // useEffect(() => {
+    //     if (!data.alleles) { return; }
+    //     const uneditedLen = data.alleles.split("/")[0].length;
+    //     const newAnnotation = {
+    //         name: data.rsID,
+    //         start: _CONTEXT_LEN,
+    //         end: _CONTEXT_LEN + uneditedLen,
+    //         direction: txDirection === "+" ? 1 : -1,
+    //         color: "blue",
+    //     };
+    //     setUneditedData(u => ({ ...u, annotations: [newAnnotation] }));
+    // }, [data.rsID, data.alleles, txDirection]);
 
     const handleSubmit = () => {
         console.log("updating unedited data...");
@@ -331,7 +331,7 @@ const Unedited = ({ handleStep, data, setData }) => {
 
     return (
         <>
-            <div style={{ width: '100%' }}>
+            <div style={{ width: "100%" }}>
                 <h1>Unedited sequence:</h1>
                 <EditableSeqViz
                     isEditable={true}
@@ -339,10 +339,11 @@ const Unedited = ({ handleStep, data, setData }) => {
                     setSeqData={setUneditedData}
                 />
             </div>
-            <div>
-                <Button onClick={handleSubmit}>Save Changes</Button>
-            </div>
-            <div>{loadingText}</div>
+            {loadingText &&
+            <Text>{loadingText}</Text>}
+            {uneditedData.seq &&
+            <Button onClick={handleSubmit}>Save Changes</Button>
+            }
         </>
     );
 };
@@ -373,21 +374,52 @@ const Unedited = ({ handleStep, data, setData }) => {
  * 
  */ 
 const Edited = ({data, handleStep, setData}) => {
-    // TODO: Update edited with rsID if present
-    // TODO: Alignment for highlighting
     // TODO: Switch unedited/edited
     const [uneditedData, setUneditedData] = useState(data.unedited);
     const [editedData, setEditedData] = useState(data.unedited);
+    const [warningMsg, setWarningMsg] = useState("")
 
     const handleSubmit = () => {
         console.log("updating edited data...");
         setData(prevData => ({ ...prevData, unedited: uneditedData, edited: editedData }));
-        handleStep(4, 5);
+        handleStep(5, 5);  // FIXME: Add step 6
     }
+    // IF RSID WAS GIVEN, AUTOMATICALLY POPULATE ALLELES
+    useEffect(() => {
+        if (!data.alleles) { return; }
+        const [minU, minE] = data.alleles.split("/");
+        const uLen = minU.length;
+        const uSeq = uneditedData.seq;
+        const eSeq = uSeq.substring(0, _CONTEXT_LEN) + minE + uSeq.substring(_CONTEXT_LEN + uLen);
+        setEditedData(e => ({ ...e, seq: eSeq }));
+    }, []);  // eslint-disable-line
+
+    // HIGHLIGHT CHANGE
+    useEffect(() => {
+        const {min_u, min_e, pre_len} = minEdit(uneditedData.seq, editedData.seq);
+        let color = "black";
+        setWarningMsg("");
+        if (min_u.length === 0 && min_e.length === 0) { setWarningMsg("No edit specified!"); }
+        else if (min_u.length === 0) { color = "lime"; }
+        else if (min_e.length === 0) { color = "pink"; }
+        else { color = "cyan"; }
+        const uHighlight = { start: pre_len, end: pre_len + min_u.length, color: color };
+        const eHighlight = { start: pre_len, end: pre_len + min_e.length, color: color };
+        if (min_u.length > 0) { setUneditedData(u => ({ ...u, highlights: [uHighlight] })); }
+        else { setUneditedData(u => ({ ...u, highlights: [] })); }
+        if (min_e.length > 0) { setEditedData(e => ({ ...e, highlights: [eHighlight] })); }
+        else { setEditedData(e => ({ ...e, highlights: [] })); }
+    }, [uneditedData.seq, editedData.seq]);
+
+    // BUTTON TO SWITCH BETWEEN UNEDITED/EDITED
+    const switchSeqs = () => {
+        setUneditedData(editedData);
+        setEditedData(uneditedData);
+    };
 
     return (
         <>
-            <div style={{ width: '100%' }}>
+            <div style={{ width: "100%" }}>
                 <h1>Unedited sequence:</h1>
                 <EditableSeqViz
                     isEditable={false}
@@ -395,7 +427,10 @@ const Edited = ({data, handleStep, setData}) => {
                     setSeqData={setUneditedData}
                 />
             </div>
-            <div style={{ width: '100%' }}>
+            <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
+                <Button onClick={switchSeqs}>{'\u21d5'}</Button>
+            </div>
+            <div style={{ width: "100%" }}>
                 <h1>Edited sequence:</h1>
                 <EditableSeqViz
                     isEditable={true}
@@ -403,10 +438,11 @@ const Edited = ({data, handleStep, setData}) => {
                     setSeqData={setEditedData}
                 />
             </div>
+            {warningMsg &&
+            <Alert isDismissible={false} hasIcon={true} variation="error">{warningMsg}</Alert>}
             <br />
-            <div>
-                <button onClick={handleSubmit}>Save Changes</button>
-            </div>
+            {!warningMsg &&
+            <Button onClick={handleSubmit}>Save Changes</Button>}
         </>
     );
 };
