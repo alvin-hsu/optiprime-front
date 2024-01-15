@@ -58,7 +58,7 @@ export const coordsToRefSeq = (coords) => {
                    "chrom=" + coords.chrom + ";" +
                    "start=" + String(coords.pos) + ";" +
                    "end=" + String(parseInt(coords.pos)+1) + ';' +
-                   "track=ncbiRefSeq")
+                   "track=ncbiRefSeqSelect")
 
     return fetch("https://api.genome.ucsc.edu/getData/track?" + query)
            .then(resp => {
@@ -68,7 +68,7 @@ export const coordsToRefSeq = (coords) => {
                return resp.json();
            })
            .then(data => {
-               return data['ncbiRefSeq'][0];
+               return data['ncbiRefSeqSelect'][0];
            });
 };
 
