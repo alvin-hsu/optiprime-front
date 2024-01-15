@@ -369,7 +369,7 @@ const Unedited = ({ handleStep, data, setData }) => {
  */ 
 const Edited = ({data, handleStep, setData}) => {
     const [uneditedData, setUneditedData] = useState(data.unedited);
-    const [editedData, setEditedData] = useState(data.unedited);
+    const [editedData, setEditedData] = useState("edited" in data ? data.edited : data.unedited);
     const [warningMsg, setWarningMsg] = useState("")
 
     const handleSubmit = () => {
