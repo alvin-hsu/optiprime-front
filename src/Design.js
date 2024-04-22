@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useSpring, animated } from "react-spring";
-import {Alert, Autocomplete, Button, Input, SelectField, Text} from "@aws-amplify/ui-react";
+import {Alert, Autocomplete, Button, Divider, Input, SelectField, Text} from "@aws-amplify/ui-react";
 
 import {
     rsIDtoHg38Coords,
@@ -9,80 +9,177 @@ import {
     getContextExonTranslations,
     fetchUCSCGenomes,
     minEdit,
-    updateCDS
+    revcomp,
+    updateCDS,
+    parseHGVS
 }
     from "./Utils";
 import EditableSeqViz from "./EditableSeqViz";
 
 
 const _CONTEXT_LEN = 50;
+const MAX_EDIT_DIST = 15;
+const PAM_RE = /[ACGT]GG[ACGT]/g  // FIXME? PAM variants
 
 const Start = ({ handleStep }) => {
     return (
         <div>
             <Text>Is the genotype you want to edit from the human genome?</Text>
             <Button onClick={() => handleStep(0, 1)}>Yes</Button>
-            <Button onClick={() => handleStep(0, 3)}>No</Button>
+            <Button onClick={() => handleStep(0, 2)}>No</Button>
         </div>
     );
 };
 
-const RsID = ({ handleStep, data, setData }) => {
-    const [rsID, setRsID] = useState("rsID" in data ? data.rsID : "");
+const Human = ({ handleStep, data, setData }) => {
     const [loadingText, setLoadingText] = useState("");
-    const [validInput, setValidInput] = useState("rsID" in data);
-    const handleInputChange = (event) => {
+    // Direct gene variant data
+    const [gene, setGene] = useState("gene" in data ? data.gene : "");
+    const [geneCoords, setGeneCoords] = useState({});
+    const [geneData, setGeneData] = useState({});
+    const [hgvsVisible, setHgvsVisible] = useState("hgvs" in data);
+    const [hgvs, setHgvs] = useState("hgvs" in data ? data.hgvs : "");
+    // rsID entry
+    const [rsID, setRsID] = useState("rsID" in data ? data.rsID : "");
+    const [validRsID, setValidRsID] = useState("rsID" in data);
+    // Genomic coordinates
+    const initHasCoords = ("coords" in data);
+    const [assembly, setAssembly] = useState(initHasCoords ? data.coords.assembly : "");
+    const [coordInputVisible, setCoordInputVisible] = useState(initHasCoords);
+    const [chrCoords, setChrCoords] = useState(initHasCoords ? data.coords.chrom + ":" + data.coords.pos : "");
+    const [validCoords, setValidCoords] = useState(initHasCoords);
+    // Support for gene variant entry
+    useEffect(() => {
+        const loadGenes = async () => {
+            try {
+                const response = await fetch("/geneLocs.json");
+                if (!response.ok) {
+                    setLoadingText("Unable to load gene locations!");
+                }
+                setGeneCoords(await response.json());
+            } catch (error) {
+                setLoadingText("Error while fetching gene locations: " + error.toString());
+            }
+        };
+        loadGenes().then(() => {});
+    }, []);
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            if ((gene !== "") && (gene in geneCoords)) {
+                setLoadingText("");
+                const chrCoords = geneCoords[gene];
+                const [chrom, pos] = chrCoords.split(":");
+                const [start, end] = pos.split("-");
+                coordsToRefSeq({ assembly: "hg38", chrom, start, end })
+                    .catch(error => {
+                        setLoadingText("Error fetching gene info for " + gene + ": " + error.toString());
+                        setGeneData({});
+                        setHgvsVisible(false);
+                    })
+                    .then(refSeq => {
+                        setGeneData(refSeq);
+                        setHgvsVisible(true);
+                    });
+            } else {
+                setLoadingText("Could not find gene: " + gene);
+                setGeneData({});
+                setHgvsVisible(false);
+            }
+        }, 100);
+        return () => clearTimeout(timeoutId);
+    }, [gene, geneCoords]);
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            if (hgvs === "") { return; }
+            const result = parseHGVS(geneData, hgvs);
+            console.log(result);
+        }, 200);
+        return () => clearTimeout(timeoutId);
+    }, [geneData, hgvs]);
+    // Support for rsID entry
+    const handleRsIDChange = (event) => {
         const newRsId = event.target.value.replace(/\D/g, "");
-        if (newRsId) { setValidInput(true); }
+        if (newRsId) {
+            setValidRsID(true);
+        }
         setRsID("rs" + newRsId);
     };
-    const handleSubmit = () => {
+    const handleRsIDSubmit = () => {
         setData(prevData => ({ ...prevData,
                                rsID: rsID }));
         setLoadingText("Querying dbSNP...");
         rsIDtoHg38Coords(rsID).then(entry => {
+            const coords = { assembly: "hg38",
+                             chrom: "chr" + entry[1],
+                             pos: entry[2] };
+            const gene = entry[3];
+            const alleles = entry[4];
             setData(prevData => ({ ...prevData,
-                                   coords: { assembly: "hg38",
-                                             chrom: "chr" + entry[1],
-                                             pos: entry[2] },
-                                   gene: entry[3],
-                                   alleles: entry[4] }));
+                                   coords, gene, alleles }));
+            return { coords, gene, alleles };
+        }).then(async x => {
+            const { coords } = x;
+            setLoadingText("Fetching reference sequence...")
+            const seq = await fetchSequenceFromCoords(coords, _CONTEXT_LEN);
+            return { ...x, seq };
+        }).then(x => {
+            const { seq, alleles } = x;
+            const [minU, minE] = alleles.split("/");
+            const uLen = minU.length;
+            const eSeq = seq.substring(0, _CONTEXT_LEN) + minE + seq.substring(_CONTEXT_LEN + uLen);
+            setData(prevData => ({ ...prevData,
+                                   unedited: { seq,
+                                               cdsList: [],
+                                               annotations: [],
+                                               translations: [] },
+                                   edited: { seq: eSeq,
+                                              cdsList: [],
+                                              annotations: [],
+                                              translations: [] } }));
+            return x;
+        }).catch(error => {
+            setLoadingText("Error fetching genomic sequence: " + error.toString());
+            setValidRsID(false);
+        }).then(async x => {
+            const { coords } = x;
+            const refSeq = await coordsToRefSeq(coords);
+            return { ...x, refSeq };
+        }).catch(error => {
+            console.log("Error fetching RefSeq data: " + error.toString());
+            handleStep(1, 4);
+        }).then(x => {
+            const { alleles, coords, refSeq } = x;
+            const [minU, minE] = alleles.split("/");
+            const uLen = minU.length;
+            const eLen = minE.length;
+            const uCdsList = getContextExonTranslations(refSeq, coords.pos, _CONTEXT_LEN);
+            const eCdsList = uCdsList.map(cds => updateCDS(cds,
+                                                           { start: _CONTEXT_LEN,
+                                                             end: _CONTEXT_LEN + uLen },
+                                                           eLen - uLen))
+                                     .filter(cds => !!cds);
+            setData(prevData => ({ ...prevData,
+                                   unedited: { ...prevData.unedited, cdsList: uCdsList },
+                                   edited: { ...prevData.edited, cdsList: eCdsList } }));
         }).then(() => {
             handleStep(1, 4);
-        }).catch(error => {
-            setLoadingText(error.toString());
-            setValidInput(false);
         });
     };
-    return (
-        <div>
-            <Text>Do you have an rsID for the mutation you're interested in?</Text>
-            <Input
-                value={rsID}
-                onChange={handleInputChange}
-                placeholder="rs#####"
-                style={{ width: "200px" }}
-            />
-            <div>{loadingText}</div>
-            {validInput &&
-            <Button onClick={handleSubmit}>Submit</Button>}
-            <Button onClick={() => handleStep(1, 2)}>No</Button>
-        </div>
-    );
-};
-
-const HGCoords = ({ handleStep, data, setData }) => {
-    const initHasCoords = ("coords" in data);
-    const [assembly, setAssembly] = useState(initHasCoords ? data.coords.assembly : "");
-    const [inputVisible, setInputVisible] = useState(initHasCoords);
-    const [chrCoords, setChrCoords] = useState(initHasCoords ? data.coords.chrom + ":" + data.coords.pos : "");
-    const [validCoords, setValidCoords] = useState(initHasCoords);
-
-    const handleDropdownChange = (event) => {
+    // Support for genome coordinates
+    useEffect(() => {
+        if (!("unedited" in data)) {
+            setData(prevData => ({ ...prevData,
+                                   unedited: { seq: "",
+                                               cdsList: [],
+                                               annotations: [],
+                                               translations: [] } }));
+        }
+    }, [data]);  // eslint-disable-line
+    const handleAssemblyChange = (event) => {
         setAssembly(event.target.value);
-        setInputVisible(!(event.target.value === ""));
+        setCoordInputVisible(!(event.target.value === ""));
     };
-    const handleInputChange = (event) => {
+    const handleChrCoordsChange = (event) => {
         let newChrCoords = event.target.value.toUpperCase();
         newChrCoords = newChrCoords.replace(/[^0-9XY:]/g, "");
         const isValid = /(?:\d|1\d|2[0-2]|[XY]):\d+/.test(newChrCoords);
@@ -94,15 +191,22 @@ const HGCoords = ({ handleStep, data, setData }) => {
             setChrCoords(event.target.value);
         }
     };
-    const handleSubmit = () => {
+    const handleChrCoordsSubmit = () => {
         const [chrom, pos] = chrCoords.split(":");
-        setData(prevData => ({ ...prevData,
-                               coords: { assembly: assembly,
-                                         chrom: chrom,
-                                         pos: pos },
-                               gene: null,
-                               alleles: null }));
-        handleStep(2, 4);
+        const coords = { assembly, chrom, pos }
+        setData(prevData => ({ ...prevData, coords }));
+        setLoadingText("Fetching reference sequence...");
+        fetchSequenceFromCoords(coords, _CONTEXT_LEN).then(seq => {
+            setData(prevData => ({ ...prevData, unedited: { ...prevData.unedited, seq }}));
+        }).catch(error => {
+            setLoadingText("Error fetching genomic sequence: " + error.toString());
+            setValidCoords(false);
+        });
+        coordsToRefSeq(coords).then(refSeq => {
+            const cdsList = getContextExonTranslations(refSeq, coords.pos, _CONTEXT_LEN);
+            setData(prevData => ({ ...prevData, unedited: { ...prevData.unedited, cdsList }}));
+        });
+        handleStep(1, 3);
     };
     const dropdownOptions = [
         { value: "hg18", label: "hg18 (NCBI36)" },
@@ -113,39 +217,65 @@ const HGCoords = ({ handleStep, data, setData }) => {
 
     return (
         <>
+            <div style={{ width: "100%" }}>{loadingText}</div>
             <div>
-                <SelectField
-                    label="Do you have genomic coordinates for the allele you want to edit?"
-                    value={assembly}
-                    onChange={handleDropdownChange}
-                    placeholder="Genome assembly"
-                    style={{ width: "300px" }}
-                >
-                    {dropdownOptions.map(option => (
-                        <option key={option.value} value={option.value}>
-                            {option.label}
-                        </option>
-                    ))}
-                </SelectField>
-            </div>
-            <div>
-                {inputVisible &&
+                <Text width="100%">Gene variant:</Text>
                 <Input
-                    value={chrCoords}
-                    onChange={handleInputChange}
-                    placeholder="chr:pos"
-                    style={{ width: "200px"}}
-                />}
+                    placeholder="Gene (e.g., CFTR)"
+                    onChange={event => setGene(event.target.value)}
+                    width="250px"
+                    display="inline-block"
+                />
+                {hgvsVisible &&
+                <Input
+                    placeholder="HGVS c.name (e.g., c.1521_1523del)"
+                    onchange={event => setHgvs(event.target.value)}
+                    width="300px"
+                    display="inline-block"
+                />
+                }
             </div>
-            <div>
+            <div style={{ width: "100%" }}>
+                <Text width="100%">dbSNP rsID:</Text>
+                <Input
+                    placeholder="rsID (e.g., rs113993960)"
+                    onChange={handleRsIDChange}
+                    width="250px"
+                />
+                {validRsID &&
+                <Button onClick={handleRsIDSubmit}>Submit</Button>}
+            </div>
+            <div style={{ width: "100%" }}>
+                <Text width="100%">Genomic coordinates:</Text>
+                <SelectField
+                    label=""
+                    labelHidden
+                    value={assembly}
+                    onChange={handleAssemblyChange}
+                    placeholder="Genome assembly"
+                    width="250px"
+                    display="inline-block"
+                >
+                {dropdownOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                        {option.label}
+                    </option>
+                ))}
+                </SelectField>
+                {coordInputVisible &&
+                <Input
+                    placeholder="Coordinate (e.g., chr7:117559592)"
+                    width="300px"
+                    onChange={handleChrCoordsChange}
+                    display="inline-block"
+                />}
                 {validCoords &&
                 <Button
-                    onClick={handleSubmit}
-                    disabled={!validCoords}
+                    onClick={handleChrCoordsSubmit}
                 >Submit</Button>}
             </div>
-            <br />
-            <Button onClick={() => handleStep(2, 4)}>Enter DNA manually</Button>
+            <Divider size="small" margin="20px 0 20px 0" />
+            <Button>Enter DNA sequences manually</Button>
         </>
     );
 };
@@ -164,11 +294,11 @@ const Organism = ({ handleStep, data, setData }) => {
     useEffect(() => {
         fetchUCSCGenomes().then(byTaxId => {
             setByTaxId(byTaxId);
-            let organisms = []
+            let organisms = [];
             for (const [taxId, taxIdData] of Object.entries(byTaxId)) {
                 organisms = [...organisms,
                              {id: taxId,
-                              label: taxIdData.name + ` [${taxIdData.scientificName}, taxID: ${taxId}]`}]
+                              label: taxIdData.name + ` [${taxIdData.scientificName}, taxID: ${taxId}]`}];
             }
             setOrganisms(organisms);
         }).finally(() => {
@@ -287,41 +417,10 @@ const Unedited = ({ handleStep, data, setData }) => {
                                                        cdsList: [],
                                                        annotations: [],
                                                        translations: [] });
-    const [loadingText, setLoadingText] = useState("");
-
-    // GET SEQUENCE WITH CONTEXT AND TRANSLATION
-    useEffect(() => {
-        if (!data.coords) { return; }
-        setLoadingText("Querying UCSC genome browser API...");
-        // Fetch sequence
-        fetchSequenceFromCoords(data.coords, _CONTEXT_LEN)
-            .then(seq => {
-                console.log("Seq from coords:" + seq);
-                setUneditedData(u => ({ ...u, seq: seq }));
-                setLoadingText("");
-            })
-            .catch(error => {
-                setLoadingText("Error fetching coordinates: " + error.toString());
-            });
-        // Fetch reference and determine position
-        coordsToRefSeq(data.coords)
-            .catch(error => {
-                setLoadingText("Error fetching annotations: " + error.toString());
-            })
-            .then(refSeq => {
-                const contextExons = getContextExonTranslations(refSeq,
-                                                                data.coords.pos,
-                                                                _CONTEXT_LEN);
-                setUneditedData(u => ({ ...u, cdsList: contextExons }));
-            })
-            .catch(_ => {});
-    }, [data.coords]); // Only rerun the effect if data.coords changes
-
     const handleSubmit = () => {
-        console.log("updating unedited data...");
         setData(prevData => ({ ...prevData, unedited: uneditedData }));
-        handleStep(4, 5)
-    }
+        handleStep(3, 4);
+    };
 
     return (
         <>
@@ -333,8 +432,6 @@ const Unedited = ({ handleStep, data, setData }) => {
                     setSeqData={setUneditedData}
                 />
             </div>
-            {loadingText &&
-            <Text>{loadingText}</Text>}
             {uneditedData.seq &&
             <Button onClick={handleSubmit}>Save Changes</Button>
             }
@@ -367,32 +464,15 @@ const Unedited = ({ handleStep, data, setData }) => {
  * if you're not in an exon. 
  * 
  */ 
-const Edited = ({data, handleStep, setData}) => {
+const Edited = ({handleStep, data, setData}) => {
     const [uneditedData, setUneditedData] = useState(data.unedited);
     const [editedData, setEditedData] = useState("edited" in data ? data.edited : data.unedited);
-    const [warningMsg, setWarningMsg] = useState("")
+    const [warningMsg, setWarningMsg] = useState("");
 
     const handleSubmit = () => {
-        console.log("updating edited data...");
         setData(prevData => ({ ...prevData, unedited: uneditedData, edited: editedData }));
-        handleStep(5, 5);  // FIXME: Add step 6
-    }
-    // IF RSID WAS GIVEN, AUTOMATICALLY POPULATE ALLELES
-    useEffect(() => {
-        if (!data.alleles) { return; }
-        const [minU, minE] = data.alleles.split("/");
-        const uLen = minU.length;
-        const eLen = minE.length;
-        const uSeq = uneditedData.seq;
-        const eSeq = uSeq.substring(0, _CONTEXT_LEN) + minE + uSeq.substring(_CONTEXT_LEN + uLen);
-        const newCDSList = uneditedData.cdsList
-                                        .map(cds => updateCDS(cds,
-                                                              { start: _CONTEXT_LEN,
-                                                                end: _CONTEXT_LEN + uLen },
-                                                              eLen - uLen))
-                                        .filter(cds => !!cds);
-        setEditedData(e => ({ ...e, seq: eSeq, cdsList: newCDSList }));
-    }, []);  // eslint-disable-line
+        handleStep(4, 5);
+    };
 
     // HIGHLIGHT CHANGE
     useEffect(() => {
@@ -447,6 +527,103 @@ const Edited = ({data, handleStep, setData}) => {
     );
 };
 
+const Protospacers = ({handleStep, data, setData}) => {
+    const [loadingText, setLoadingText] = useState("");
+    const [uneditedData, setUneditedData] = useState(data.unedited);
+    const [editedData, setEditedData] = useState(data.edited);
+    const [protos, setProtos] = useState([]);
+
+    useEffect(() => {
+        const {minU, preLen, postLen} = minEdit(uneditedData.seq, editedData.seq);
+        const preHom = uneditedData.seq.substring(0, preLen);
+        const postHom = uneditedData.seq.substring(uneditedData.seq.length - postLen);
+        const uLen = minU.length;
+        let entries = [];
+        // FIND FORWARD PROTOSPACERS
+        const fSearch = (preHom.substring(preLen - MAX_EDIT_DIST) +
+                         minU.substring(0, Math.min(uLen, 7)) +
+                         postHom.substring(0, Math.max(0, 7 - Math.min(uLen, 7))));
+        const fIdxs = [...fSearch.matchAll(PAM_RE)].map(x => x.index);
+        fIdxs.forEach(x => {
+            const direction = "+";
+            const end20 = preLen - MAX_EDIT_DIST + x;
+            const start20 = end20 - 20;
+            const proto30 = uneditedData.seq.substring(start20 - 4, end20 + 6)
+            const unedited = uneditedData.seq.substring(end20 - 3);
+            const edited = editedData.seq.substring(end20 - 3);
+            const entry = { direction, start20, end20, proto30, unedited, edited };
+            entries = [ ...entries, entry ];
+        });
+        // FIND REVERSE PROTOSPACERS
+        const uneditedRC = revcomp(uneditedData.seq);
+        const editedRC = revcomp(editedData.seq);
+        const rSearch = (revcomp(postHom).substring(postLen - MAX_EDIT_DIST) +
+                         revcomp(minU).substring(0, Math.min(uLen, 7)) +
+                         revcomp(preHom).substring(0, Math.max(0, 7 - Math.min(uLen, 7))));
+        const rIdxs = [...rSearch.matchAll(PAM_RE)].map(x => x.index);
+        rIdxs.forEach(x => {
+            const direction = "-";
+            const rcEnd20 = postLen - MAX_EDIT_DIST + x;
+            const rcStart20 = rcEnd20 - 20;
+            const start20 = uneditedData.seq.length - rcEnd20;
+            const end20 = uneditedData.seq.length - rcStart20;
+            const proto30 = uneditedRC.substring(rcStart20 - 4, rcEnd20 + 6);
+            const unedited = uneditedRC.substring(rcEnd20 - 3);
+            const edited = editedRC.substring(rcEnd20 - 3);
+            const entry = { direction, start20, end20, proto30, unedited, edited };
+            entries = [ ...entries, entry ];
+        });
+        setProtos(entries);
+    }, [uneditedData.seq, editedData.seq]);
+    useEffect(() => {
+        const unchecked = protos.filter(entry => !("rs3" in entry));
+        if (unchecked.length > 0) {
+            setLoadingText("Evaluating protospacers with Doench Rule Set 3...");
+            const checked = protos.filter(entry => "rs3" in entry);
+            const query = protos.map(entry => entry.proto30).join(",");  // TODO? Non-NGG set PAM
+            const url = "https://api.optipri.me/utils/doench-rs3?seqs=" + query;
+            fetch(url).then(resp => {
+                if (!resp.ok) {
+                    setLoadingText("Error evaluating protospacers.");
+                }
+                return resp.json();
+            }).then(data => {
+                const update = unchecked.map((e, i) => ({ ...e, rs3: data[i] }));
+                setProtos(checked.concat(update));
+                setLoadingText("");
+            });
+        }
+    }, [protos]);
+    useEffect(() => {
+        const annotations = protos.map(x => {
+            const id = x.direction === "+" ? "+" + (x.end20 - 3).toString() :
+                                             "-" + (x.start20 + 3).toString();
+            const name = "rs3" in x ? id + " (RS3 = " + x.rs3.toFixed(4) + ")" : id;
+            const direction = x.direction === "+" ? 1 : -1;
+            const color = "rs3" in x ? "lightblue" : "gray";
+            return { name,
+                     start: x.start20,
+                     end: x.end20,
+                     direction,
+                     color }
+        });
+        setUneditedData({ ...uneditedData, annotations });
+    }, [protos]);
+
+    return (
+        <>
+            <div style={{ width: "100%" }}>{loadingText}</div>
+            <div style={{ width: "100%" }}>
+                <h1>Protospacers:</h1>
+                <EditableSeqViz
+                    isEditable={false}
+                    seqData={uneditedData}
+                />
+            </div>
+        </>
+    );
+};
+
 
 export default function Design() {
     const [step, setStep] = useState(0);
@@ -459,12 +636,12 @@ export default function Design() {
     }));
 
     const STEPS = [
-        { label: "Start",    component: Start },        // 0 -> (1, 3)
-        { label: "RsID",     component: RsID },         // 1 -> (2, 4)
-        { label: "Coords",   component: HGCoords },     // 2 -> 4
-        { label: "Organism", component: Organism },     // 3 -> 4
-        { label: "Unedited", component: Unedited },     // 4 -> 5
-        { label: "Edited",   component: Edited }        // 5 -> 6
+        { label: "Start",        component: Start },        // 0 -> (1, 2)
+        { label: "Human",        component: Human },        // 1 -> (3, 4)
+        { label: "Organism",     component: Organism },     // 2 -> 3
+        { label: "Unedited",     component: Unedited },     // 3 -> 4
+        { label: "Edited",       component: Edited },       // 4 -> 5
+        { label: "Protospacers", component: Protospacers }  // 5 -> 6
     ];
 
     const handleStep = (currStep, nextStep) => {

@@ -176,7 +176,6 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
         if (!editEnabled) {
             setSelection({ clockwise: true, start: NaN, end: NaN });
         } else {
-            console.log(userSelection);
             setSelection(userSelection);
         }
     };

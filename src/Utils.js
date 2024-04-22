@@ -54,21 +54,26 @@ export const fetchUCSCGenomes = () => {
 };
 
 export const coordsToRefSeq = (coords) => {
-   const query = ("genome=" + coords.assembly + ";" +
-                   "chrom=" + coords.chrom + ";" +
-                   "start=" + String(coords.pos) + ";" +
-                   "end=" + String(parseInt(coords.pos)+1) + ';' +
-                   "track=ncbiRefSeqSelect")
+    let query;
+    if (("start" in coords) && ("end" in coords)) {
+        const { assembly, chrom, start, end } = coords;
+        query = { track: "ncbiRefSeqSelect", genome: assembly, chrom, start, end };
+    } else {
+        const { assembly, chrom, pos } = coords;
+        const start = parseInt(pos);
+        const end = parseInt(pos) + 1;
+        query = { track: "ncbiRefSeqSelect", genome: assembly, chrom, start, end }
+    }
+    const url = new URL("https://api.genome.ucsc.edu/getData/track");
+    url.search = new URLSearchParams(query).toString().replace(/&/g, ';');
 
-    return fetch("https://api.genome.ucsc.edu/getData/track?" + query)
-           .then(resp => {
+    return fetch(url).then(resp => {
                if (!resp.ok) {
-                   throw new Error("Failed to get RefSeq annotations from UCSC")
+                   throw new Error("Failed to get RefSeq annotations from UCSC");
                }
                return resp.json();
-           })
-           .then(data => {
-               return data['ncbiRefSeqSelect'][0];
+           }).then(data => {
+               return data["ncbiRefSeqSelect"][0];
            });
 };
 
@@ -101,45 +106,6 @@ export const fetchSequenceFromCoords = (coords, contextLen) => {
 
 // ****************************** COMPUTATION ******************************
 /* 
- * Figure out if an index is in an intron, exon or out of scope based on 
- * ncbiRefSeq objects from https://api.genome.ucsc.edu/getData/track
- *
- */
-export const indexAnnotations = (index, geneData) => {
-    // console.log("Debug Parameters:", { index, geneData });
-    if (!geneData || !geneData["exonStarts"] || !geneData["exonEnds"]) {
-        return { posType: "Intergenic" };
-    }
-    const exonStarts = geneData["exonStarts"].split(',').map(Number).filter(n => !isNaN(n));
-    const exonEnds = geneData["exonEnds"].split(',').map(Number).filter(n => !isNaN(n));
-    const exonFrames =  geneData["exonFrames"].split(',').map(Number).filter(n => !isNaN(n));
-    // are we in any of the exons?
-    for (let i = 0; i < exonStarts.length; i++) {
-        if (index >= exonStarts[i] && index <= exonEnds[i]) {
-            // it's an exon! Which one, where does it start and what's the frame?
-            return { posType: "Exon",
-                     exonNum: i + 1,
-                     exonStart: exonStarts[i],
-                     exonEnd: exonEnds[i],
-                     exonFrame: exonFrames[i] };  // TODO: Is this data necessary?
-        }
-    }
-    // Out of scope?
-    if (index < geneData["txStart"] || index > geneData["txEnd"]) {
-        return { posType: "Intergenic",
-                 nearestGene: geneData["name2"] };
-    }
-    // intron?
-    for (let i = 0; i < exonEnds.length; i++) {
-        if (index > exonEnds[i] && (i === exonEnds.length - 1 || index < exonStarts[i + 1])) {
-            return { posType: "Intergenic",
-                     prevExonNum: i + 1 };
-        }
-    }
-    return ["huh?", -1]; // Default return if not caught by above cases
-}
-
-/* 
  * Figure out the starts and ends of Exons in a specific context window
  * using ncbiRefSeq objects from https://api.genome.ucsc.edu/getData/track
  * Schema: https://genome.ucsc.edu/cgi-bin/hgTables?db=hg38&hgta_group=genes&hgta_track=refSeqComposite&hgta_table=refGene&hgta_doSchema=describe+table+schema
@@ -165,12 +131,7 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
         exonEnds[exonEnds.length - 1] = cdsStart;
         exonFrames[exonFrames.length - 1] = 0;
     }
-
     let contextExons = [];
-    // console.log("Context Start:", contextStart);
-    // console.log("Context End:", contextEnd);
-    // console.log("Context Len:", contextLen);
-    // console.log("Target:", target);
     for (let i = 0; i < exonStarts.length; i++) {
         // Check handles all four cases:
         // - Start before end after
@@ -190,7 +151,6 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
             }
             if (exonEnds[i] > contextEnd && geneData["strand"] === '-') {
                 const distanceFromContextStart = exonEnds[i] - contextEnd;
-                console.log(distanceFromContextStart);
                 adjustedFrame = (exonFrames[i] + distanceFromContextStart) % 3;
             }
             contextExons.push({
@@ -295,4 +255,24 @@ export const updateCDS = (cds, selection, delta) => {
     } else {
         return { ...cds };
     }
+};
+
+/*
+ * Return the reverse complement of a DNA sequence.
+ */
+export const revcomp = (seq) => {
+    const complement = seq.replaceAll("A", "t")
+                          .replaceAll("C", "g")
+                          .replaceAll("G", "c")
+                          .replaceAll("T", "a")
+                          .toUpperCase();
+    return complement.split("").reverse().join("");
+};
+
+/*
+ * Get genomic coordinates and alleles based on HGVS nomenclature for genes.
+ */
+const coordRe = /[cC]\.(\d+|\*\d+|-\d+)([+-]\d+)?/;
+export const parseHGVS = (geneData, hgvs) => {
+
 };
