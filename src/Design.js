@@ -199,7 +199,9 @@ const Human = ({ handleStep, data, setData }) => {
         setLoadingText("Fetching reference sequence...");
         fetchSequenceFromCoords(coords, _CONTEXT_LEN).then(seq => {
             setData(prevData => ({ ...prevData, unedited: { ...prevData.unedited, seq }}));
+            handleStep(1, 3);
         }).catch(error => {
+            console.log(error);
             setLoadingText("Error fetching genomic sequence: " + error.toString());
             setValidCoords(false);
         });
@@ -207,7 +209,6 @@ const Human = ({ handleStep, data, setData }) => {
             const cdsList = getContextExonTranslations(refSeq, coords.pos, _CONTEXT_LEN);
             setData(prevData => ({ ...prevData, unedited: { ...prevData.unedited, cdsList }}));
         });
-        handleStep(1, 3);
     };
     const dropdownOptions = [
         { value: "hg18", label: "hg18 (NCBI36)" },
@@ -331,7 +332,7 @@ const Organism = ({ handleStep, data, setData }) => {
                                          pos: pos },
                                gene: null,
                                alleles: null }));
-        handleStep(3, 4);
+        handleStep(2, 3);
     };
 
     return (
