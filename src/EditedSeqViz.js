@@ -211,7 +211,7 @@ export default function EditedSeqViz({ seqData }) {
 
     return (
         <div style={{ height: "100%", verticalAlign: "top" }}>
-            <div style={{ height: "200px", width: "100%", display: "block", marginBottom: "25px" }}>
+            <div style={{ height: "195px", width: "100%", display: "block" }}>
                 <SeqViz
                     { ...seqData }
                     annotations={currAnns}

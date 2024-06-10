@@ -287,7 +287,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
 
     return (
         <div style={{ height: "100%", verticalAlign: "top" }}>
-            <div style={{ height: "150px", width: "100%", display: "block", marginBottom: "25px" }}>
+            <div style={{ height: "150px", width: "100%", display: "block" }}>
                 {seqData.seq !== "" &&  // Because SeqViz refuses to update when seq is ""
                 <SeqViz
                     { ...seqData }

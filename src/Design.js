@@ -19,7 +19,7 @@ import EditedSeqViz from "./EditedSeqViz";
 import UneditedSeqViz from "./UneditedSeqViz";
 
 
-const _CONTEXT_LEN = 50;
+const _CONTEXT_LEN = 75;
 const MAX_EDIT_DIST = 18;
 const PAM_RE = /[ACGT]GG[ACGT]/g;  // FIXME? PAM variants
 const EXP_PAM_RE = /[ACGT]/g;

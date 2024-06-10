@@ -33,7 +33,7 @@ export default function UneditedSeqViz({ seqData, name }) {
     }, [seqData, name]);
     return (
         <div style={{ height: "100%", verticalAlign: "top" }}>
-            <div style={{ height: "70px", width: "100%", display: "block", marginBottom: "25px" }}>
+            <div style={{ height: "97px", width: "100%", display: "block" }}>
                 <SeqViz
                     { ...seqData }
                     viewer="linear"
