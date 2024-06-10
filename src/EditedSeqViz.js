@@ -6,7 +6,7 @@ import { codonTableForward, codonTableReverse, aminoAcidColors, darkAminoAcidCol
 
 const CODON_RE = /[ACDEFGHIKLMNPQRSTVWY*]#\d+-\d+/
 const MENU_RE = /MENU\[(\d+)]/
-const MAX_DIST = 15;
+const MAX_DIST = 18;
 
 const editSegments = (seq, cds) => {
     const { start, end, frame, direction } = cds;
@@ -76,7 +76,7 @@ const editSegments = (seq, cds) => {
     return segObjects;
 };
 
-export default function EntrySeqViz({ seqData }) {
+export default function EditedSeqViz({ seqData }) {
     // Annotation management
     const [origAnns, setOrigAnns] = useState([]);
     const [currAnns, setCurrAnns] = useState([]);
@@ -93,8 +93,11 @@ export default function EntrySeqViz({ seqData }) {
 
     // Initialization
     useEffect(() => {
+        if (typeof seqData === "undefined") {
+            return;
+        }
         let anns = "annotations" in seqData ? seqData.annotations : [];
-        const uneditable = { name: "1 (pre-edit)", start: 0, end: 21, direction: 0, color: "gray" };
+        const uneditable = { name: "", start: 0, end: 21, direction: 0, color: "gray" };
         anns = [ ...anns, uneditable ];
         if (("cdsList" in seqData) && (seqData.cdsList.length > 0)) {
             const cdsAandTs = seqData.cdsList.map(cds => makeCDSAandTs(cds));

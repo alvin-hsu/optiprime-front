@@ -15,12 +15,15 @@ import {
 }
     from "./Utils";
 import EditableSeqViz from "./EditableSeqViz";
+import EditedSeqViz from "./EditedSeqViz";
+import UneditedSeqViz from "./UneditedSeqViz";
 
 
 const _CONTEXT_LEN = 50;
-const MAX_EDIT_DIST = 15;
+const MAX_EDIT_DIST = 18;
 const PAM_RE = /[ACGT]GG[ACGT]/g;  // FIXME? PAM variants
 const EXP_PAM_RE = /[ACGT]/g;
+const PROTO_RE = /[+-]\d+/;
 
 const Start = ({ handleStep }) => {
     return (
@@ -530,20 +533,27 @@ const Edited = ({handleStep, data, setData}) => {
 };
 
 const Protospacers = ({handleStep, data, setData}) => {
+    // Unpack constants
     const uneditedData = data.unedited;
     const editedData = data.edited;
-
+    // Misc. state
     const [loadingText, setLoadingText] = useState("");
     const [origAnns, setOrigAnns] = useState([]);
     const [currAnns, setCurrAnns] = useState([]);
+    // Protospacers
     const [protos, setProtos] = useState([]);
+    const [protoMap, setProtoMap] = useState({});
+    // Manage selected protospacer
+    const [selected, setSelected] = useState("");
+    const [usvData, setUsvData] = useState({});
+    const [esvData, setEsvData] = useState({});
 
     // Set origAnns (originalAnnotations) on first load
     useEffect(() => {
         const uneditedAnns = "annotations" in uneditedData ? uneditedData.annotations : [];
         setOrigAnns(uneditedAnns);
     }, [uneditedData]);
-    // Search for NGG protospacers
+    // Search for NGG protospacers  FIXME: PAM variants
     useEffect(() => {
         const {minU, preLen, postLen} = minEdit(uneditedData.seq, editedData.seq);
         const preHom = uneditedData.seq.substring(0, preLen);
@@ -560,9 +570,10 @@ const Protospacers = ({handleStep, data, setData}) => {
             const end20 = preLen - MAX_EDIT_DIST + x;
             const start20 = end20 - 20;
             const proto30 = uneditedData.seq.substring(start20 - 4, end20 + 6)
-            const unedited = uneditedData.seq.substring(end20 - 3);
-            const edited = editedData.seq.substring(end20 - 3);
-            const entry = { direction, start20, end20, proto30, unedited, edited };
+            const unedited = uneditedData.seq.substring(start20 - 4);
+            const edited = editedData.seq.substring(start20 - 4);
+            const id = `${direction}${end20 - 3}`;
+            const entry = { id, direction, start20, end20, proto30, unedited, edited };
             entries = [ ...entries, entry ];
         });
         // FIND REVERSE PROTOSPACERS
@@ -579,15 +590,17 @@ const Protospacers = ({handleStep, data, setData}) => {
             const start20 = uneditedData.seq.length - rcEnd20;
             const end20 = uneditedData.seq.length - rcStart20;
             const proto30 = uneditedRC.substring(rcStart20 - 4, rcEnd20 + 6);
-            const unedited = uneditedRC.substring(rcEnd20 - 3);
-            const edited = editedRC.substring(rcEnd20 - 3);
-            const entry = { direction, start20, end20, proto30, unedited, edited };
+            const unedited = uneditedRC.substring(rcStart20 - 4);
+            const edited = editedRC.substring(rcStart20 - 4);
+            const id = `${direction}${start20 - 3}`;
+            const entry = { id, direction, start20, end20, proto30, unedited, edited };
             entries = [ ...entries, entry ];
         });
         setProtos(entries);
     }, [uneditedData.seq, editedData.seq]);
-    // Evaluate Doench RS3 scores when protospacer array updates
+    // Protospacer array updates
     useEffect(() => {
+        // Evaluate Doench RS3 scores when protospacer array updates
         const unchecked = protos.filter(entry => !("rs3" in entry));
         if (unchecked.length > 0) {
             setLoadingText("Evaluating protospacers with Doench Rule Set 3...");
@@ -605,13 +618,13 @@ const Protospacers = ({handleStep, data, setData}) => {
                 setLoadingText("");
             });
         }
+        // Update protospacer map
+        setProtoMap(Object.fromEntries(protos.map(x => [x.id, x])));
     }, [protos]);
     // Update annotations
     useEffect(() => {
         const newAnnotations = protos.map(x => {
-            const id = x.direction === "+" ? "+" + (x.end20 - 3).toString() :
-                                             "-" + (x.start20 + 3).toString();
-            const name = "rs3" in x ? id + " (RS3 = " + x.rs3.toFixed(4) + ")" : id;
+            const name = "rs3" in x ? x.id + " (RS3 = " + x.rs3.toFixed(4) + ")" : x.id;
             const direction = x.direction === "+" ? 1 : -1;
             const color = "rs3" in x ? "lightblue" : "gray";
             return { name,
@@ -621,8 +634,71 @@ const Protospacers = ({handleStep, data, setData}) => {
                      color }
         });
         const annotations = [ ...origAnns, ...newAnnotations ]
-        setCurrAnns(u => ({ ...u, annotations }));
+        setCurrAnns(annotations);
     }, [origAnns, protos]);
+    // For updating CDS data to entries
+    const updateCDS = (cds, entry) => {
+        const eDir = entry.direction;
+        const start20 = entry.start20;
+        const end20 = entry.end20;
+        const { name, start, end, direction, frame } = cds;
+        let newDir, newStart, newEnd, newFrame;
+        if (direction === "+") {
+            if (eDir === "+") {
+                const eStart = start20 - 4;
+                newDir = "+";
+                newStart = Math.max(0, start - eStart);
+                newEnd = end - eStart;
+                newFrame = (frame + eStart) % 3;
+            } else {
+                const eStart = end20 + 4;
+                newDir = "-";
+                newStart = Math.max(0, eStart - end);
+                newEnd = start + eStart;
+                newFrame = frame;
+            }
+        } else {  // FIXME
+            if (eDir === "+") {
+                newDir = "-"
+                newStart = 0;
+                newEnd = 5;
+                newFrame = 0;
+            } else {
+                newDir = "+"
+                newStart = 0;
+                newEnd = 5;
+                newFrame = 0;
+            }
+        }
+        return { name, direction: newDir, start: newStart, end: newEnd, frame: newFrame }
+    };
+    // Handle clicking on selections
+    const selHandler = (e) => {
+        const name = e.name.split(" ")[0];
+        if (PROTO_RE.test(name) && (name in protoMap)) {
+            setSelected(name);
+        }
+    };
+    useEffect(() => {
+        if (selected in protoMap) {
+            const entry = protoMap[selected];
+            const name = "rs3" in entry ? entry.id + " (RS3 = " + entry.rs3.toFixed(4) + ")" : entry.id;
+            console.log(uneditedData.cdsList);
+            console.log(uneditedData.cdsList.map(updateCDS));
+            const uData = { seqData: {
+                                seq: entry.unedited,
+                                cdsList: uneditedData.cdsList.map(x => updateCDS(x, entry))
+                            },
+                            name }
+            const eData = { seqData: {
+                                seq: entry.edited,
+                                cdsList: editedData.cdsList.map(x => updateCDS(x, entry))
+                            }
+                          }
+            setUsvData(uData);
+            setEsvData(eData);
+        }
+    }, [protoMap, selected, protos]);
 
     return (
         <>
@@ -632,10 +708,21 @@ const Protospacers = ({handleStep, data, setData}) => {
                     isEditable={false}
                     seqData={{ ...uneditedData,
                                annotations: currAnns }}
+                    selHandler={selHandler}
                 />
                 <div style={{ width: "100%" }}>{loadingText}</div>
-                <h2>Select the protospacers you would like to evaluate:</h2>
-
+                {selected &&
+                <>
+                    <h3>Unedited:</h3>
+                    <UneditedSeqViz
+                        { ...usvData }
+                    />
+                    <h3>Edited:</h3>
+                    <EditedSeqViz
+                        { ...esvData }
+                    />
+                </>
+                }
             </div>
         </>
     );
