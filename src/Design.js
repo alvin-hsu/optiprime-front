@@ -613,9 +613,15 @@ const Protospacers = ({handleStep, data, setData}) => {
                 }
                 return resp.json();
             }).then(data => {
-                const update = unchecked.map((e, i) => ({ ...e, rs3: data[i] }));
-                setProtos(checked.concat(update));
-                setLoadingText("");
+                if (Array.isArray(data)) {
+                    const update = unchecked.map((e, i) => ({ ...e, rs3: data[i] }));
+                    setProtos(checked.concat(update));
+                    setLoadingText("");
+                } else {
+                    const update = { ...unchecked[0], rs3: data };
+                    setProtos([ ...checked, update ]);
+                    setLoadingText("");
+                }
             });
         }
         // Update protospacer map
@@ -624,7 +630,9 @@ const Protospacers = ({handleStep, data, setData}) => {
     // Update annotations
     useEffect(() => {
         const newAnnotations = protos.map(x => {
-            const name = "rs3" in x ? x.id + " (RS3 = " + x.rs3.toFixed(4) + ")" : x.id;
+            const name = ((("rs3" in x) && (typeof x.rs3 !== "undefined")) ?
+                          x.id + " (RS3 = " + x.rs3.toFixed(4) + ")" :
+                          x.id);
             const direction = x.direction === "+" ? 1 : -1;
             const color = "rs3" in x ? "lightblue" : "gray";
             return { name,
@@ -637,40 +645,37 @@ const Protospacers = ({handleStep, data, setData}) => {
         setCurrAnns(annotations);
     }, [origAnns, protos]);
     // For updating CDS data to entries
-    const updateCDS = (cds, entry) => {
-        const eDir = entry.direction;
-        const start20 = entry.start20;
-        const end20 = entry.end20;
-        const { name, start, end, direction, frame } = cds;
-        let newDir, newStart, newEnd, newFrame;
-        if (direction === "+") {
-            if (eDir === "+") {
-                const eStart = start20 - 4;
-                newDir = "+";
-                newStart = Math.max(0, start - eStart);
-                newEnd = end - eStart;
-                newFrame = (frame + eStart) % 3;
-            } else {
-                const eStart = end20 + 4;
-                newDir = "-";
-                newStart = Math.max(0, eStart - end);
-                newEnd = start + eStart;
-                newFrame = frame;
-            }
-        } else {  // FIXME
-            if (eDir === "+") {
-                newDir = "-"
-                newStart = 0;
-                newEnd = 5;
-                newFrame = 0;
-            } else {
-                newDir = "+"
-                newStart = 0;
-                newEnd = 5;
-                newFrame = 0;
-            }
+    const updateCDS = (cds, ps) => {
+        // Protospacer info
+        const psDir = ps.direction;
+        const psStart = (psDir === "+") ? (ps.start20 - 4) : (ps.end20 + 4);
+        // CDS info
+        const cDir = cds.direction;
+        const cStart = cds.start;
+        const cEnd = cds.end;
+        const cFrame = cds.frame;
+        // New CDS info
+        const newDir = (psDir === cDir) ? "+" : "-";
+        let start, end, frame;
+        if ((cDir === "+") && (psDir === "+")) {
+            start = Math.max(0, cStart - psStart);
+            end = cEnd - psStart;
+            frame = (psStart <= cStart) ? cFrame : (cFrame + psStart - cStart) % 3;
+        } else if ((cDir === "+") && (psDir === "-")) {
+            start = Math.max(0, psStart - cEnd);
+            end = psStart - cStart;
+            frame = cFrame;
+        } else if ((cDir === "-") && (psDir === "+")) {
+            start = Math.max(0, cStart - psStart);
+            end = cEnd - psStart;
+            frame = cFrame;
+        } else {
+            start = Math.max(0, psStart - cEnd);
+            end = psStart - cStart;
+            frame = (psStart >= cEnd) ? cFrame : (cFrame + cEnd - psStart) % 3;
         }
-        return { name, direction: newDir, start: newStart, end: newEnd, frame: newFrame }
+        return { name: ps.name, direction: newDir,
+                 start, end, frame }
     };
     // Handle clicking on selections
     const selHandler = (e) => {
