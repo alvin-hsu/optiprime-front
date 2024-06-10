@@ -293,6 +293,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData }) {
                     annotations={annotations}
                     translations={translations}
                     onSelection={selectionHandler}
+                    showIndex={false}
                 />}
             </div>
             {isEditable &&

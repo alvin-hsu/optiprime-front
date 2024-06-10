@@ -19,7 +19,8 @@ import EditableSeqViz from "./EditableSeqViz";
 
 const _CONTEXT_LEN = 50;
 const MAX_EDIT_DIST = 15;
-const PAM_RE = /[ACGT]GG[ACGT]/g  // FIXME? PAM variants
+const PAM_RE = /[ACGT]GG[ACGT]/g;  // FIXME? PAM variants
+const EXP_PAM_RE = /[ACGT]/g;
 
 const Start = ({ handleStep }) => {
     return (
@@ -528,11 +529,20 @@ const Edited = ({handleStep, data, setData}) => {
 };
 
 const Protospacers = ({handleStep, data, setData}) => {
+    const uneditedData = data.unedited;
+    const editedData = data.edited;
+
     const [loadingText, setLoadingText] = useState("");
-    const [uneditedData, setUneditedData] = useState(data.unedited);
-    const [editedData, setEditedData] = useState(data.edited);
+    const [origAnns, setOrigAnns] = useState([]);
+    const [currAnns, setCurrAnns] = useState([]);
     const [protos, setProtos] = useState([]);
 
+    // Set origAnns (originalAnnotations) on first load
+    useEffect(() => {
+        const uneditedAnns = "annotations" in uneditedData ? uneditedData.annotations : [];
+        setOrigAnns(uneditedAnns);
+    }, [uneditedData]);
+    // Search for NGG protospacers
     useEffect(() => {
         const {minU, preLen, postLen} = minEdit(uneditedData.seq, editedData.seq);
         const preHom = uneditedData.seq.substring(0, preLen);
@@ -575,6 +585,7 @@ const Protospacers = ({handleStep, data, setData}) => {
         });
         setProtos(entries);
     }, [uneditedData.seq, editedData.seq]);
+    // Evaluate Doench RS3 scores when protospacer array updates
     useEffect(() => {
         const unchecked = protos.filter(entry => !("rs3" in entry));
         if (unchecked.length > 0) {
@@ -594,8 +605,9 @@ const Protospacers = ({handleStep, data, setData}) => {
             });
         }
     }, [protos]);
+    // Update annotations
     useEffect(() => {
-        const annotations = protos.map(x => {
+        const newAnnotations = protos.map(x => {
             const id = x.direction === "+" ? "+" + (x.end20 - 3).toString() :
                                              "-" + (x.start20 + 3).toString();
             const name = "rs3" in x ? id + " (RS3 = " + x.rs3.toFixed(4) + ")" : id;
@@ -607,18 +619,22 @@ const Protospacers = ({handleStep, data, setData}) => {
                      direction,
                      color }
         });
-        setUneditedData({ ...uneditedData, annotations });
-    }, [protos]);
+        const annotations = [ ...origAnns, ...newAnnotations ]
+        setCurrAnns(u => ({ ...u, annotations }));
+    }, [origAnns, protos]);
 
     return (
         <>
-            <div style={{ width: "100%" }}>{loadingText}</div>
             <div style={{ width: "100%" }}>
                 <h1>Protospacers:</h1>
                 <EditableSeqViz
                     isEditable={false}
-                    seqData={uneditedData}
+                    seqData={{ ...uneditedData,
+                               annotations: currAnns }}
                 />
+                <div style={{ width: "100%" }}>{loadingText}</div>
+                <h2>Select the protospacers you would like to evaluate:</h2>
+
             </div>
         </>
     );
