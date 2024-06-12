@@ -112,6 +112,10 @@ export const fetchSequenceFromCoords = (coords, contextLen) => {
  * 
  */
 export const getContextExonTranslations = (geneData, target, contextLen) => {
+    if (typeof geneData === "undefined") {
+        return [];
+    }
+
     const contextStart = Number(target) - Number(contextLen);
     const contextEnd = Number(target) + Number(contextLen);
 

@@ -117,7 +117,7 @@ const Human = ({ handleStep, data, setData }) => {
                              chrom: "chr" + entry[1],
                              pos: entry[2] };
             const gene = entry[3];
-            const alleles = entry[4];
+            const alleles = entry[4].replaceAll(" ", "").split(",")[0];
             setData(prevData => ({ ...prevData,
                                    coords, gene, alleles }));
             return { coords, gene, alleles };
@@ -280,7 +280,7 @@ const Human = ({ handleStep, data, setData }) => {
                 >Submit</Button>}
             </div>
             <Divider size="small" margin="20px 0 20px 0" />
-            <Button>Enter DNA sequences manually</Button>
+            <Button onClick={() => { handleStep(1, 3); }}>Enter DNA sequences manually</Button>
         </>
     );
 };
@@ -370,7 +370,7 @@ const Organism = ({ handleStep, data, setData }) => {
             {validCoords &&
             <Button onClick={handleSubmit}>Submit</Button>}
             <Text>Want to enter your genomic DNA sequence directly?</Text>
-            <Button onClick={() => {handleStep(3, 4);}}>Enter DNA manually</Button>
+            <Button onClick={() => {handleStep(2, 3);}}>Enter DNA manually</Button>
         </>
     );
 };
@@ -703,7 +703,7 @@ const Protospacers = ({handleStep, data, setData}) => {
             setUsvData(uData);
             setEsvData(eData);
         }
-    }, [protoMap, selected, protos]);
+    }, [protoMap, selected, protos, editedData.cdsList, uneditedData.cdsList]);
 
     return (
         <>
