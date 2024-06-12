@@ -606,7 +606,7 @@ const Protospacers = ({handleStep, data, setData}) => {
             setLoadingText("Evaluating protospacers with Doench Rule Set 3...");
             const checked = protos.filter(entry => "rs3" in entry);
             const query = protos.map(entry => entry.proto30).join(",");  // TODO? Non-NGG set PAM
-            const url = "https://api.optipri.me/utils/doench-rs3?seqs=" + query;
+            const url = "https://api.optipri.me/utils/doench_rs3?seqs=" + query;
             fetch(url).then(resp => {
                 if (!resp.ok) {
                     setLoadingText("Error evaluating protospacers.");
