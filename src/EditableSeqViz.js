@@ -300,7 +300,6 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
             const div = document.querySelector(`#${divId}`).querySelector(".la-vz-seqblock");
             if (div !== null) {
                 const aRows = div.querySelectorAll(".la-vz-linear-annotation-row").length;
-                console.log(aRows);
                 setHeight(102 + 16 * aRows);
             }
         }
