@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { useSpring, animated } from "react-spring";
-import {Alert, Autocomplete, Button, Divider, Input, SelectField, Text} from "@aws-amplify/ui-react";
+import {
+    Alert,
+    Autocomplete,
+    Button,
+    Divider,
+    Input,
+    SelectField,
+    SliderField,
+    SwitchField,
+    Text
+} from "@aws-amplify/ui-react";
 
 import {
     rsIDtoHg38Coords,
@@ -21,8 +31,6 @@ import UneditedSeqViz from "./UneditedSeqViz";
 
 const _CONTEXT_LEN = 75;
 const MAX_EDIT_DIST = 18;
-const PAM_RE = /[ACGT]GG[ACGT]/g;  // FIXME? PAM variants
-const EXP_PAM_RE = /[ACGT]/g;
 const PROTO_RE = /[+-]\d+/;
 
 const Start = ({ handleStep }) => {
@@ -44,7 +52,7 @@ const Human = ({ handleStep, data, setData }) => {
     const [hgvsVisible, setHgvsVisible] = useState("hgvs" in data);
     const [hgvs, setHgvs] = useState("hgvs" in data ? data.hgvs : "");
     // rsID entry
-    const [rsID, setRsID] = useState("rsID" in data ? data.rsID : "");
+    const [rsID, setRsID] = useState("rsID" in data ? data.rsID : "rs113993960");
     const [validRsID, setValidRsID] = useState("rsID" in data);
     // Genomic coordinates
     const initHasCoords = ("coords" in data);
@@ -244,6 +252,7 @@ const Human = ({ handleStep, data, setData }) => {
                 <Text width="100%">dbSNP rsID:</Text>
                 <Input
                     placeholder="rsID (e.g., rs113993960)"
+                    defaultValue="rs113993960"
                     onChange={handleRsIDChange}
                     width="250px"
                 />
@@ -536,8 +545,14 @@ const Protospacers = ({handleStep, data, setData}) => {
     // Unpack constants
     const uneditedData = data.unedited;
     const editedData = data.edited;
+    // HT-PAMDA data
+    const [PAMDA, setPAMDA] = useState({});
+    const [pamMap, setPamMap] = useState({});
+    const [pamCutoff, setPamCutoff] = useState(-1.75);
     // Misc. state
     const [loadingText, setLoadingText] = useState("");
+    const [useVars, setUseVars] = useState(false);  // Using PAM variants
+    const [rs3Cache, setRs3Cache] = useState({});
     const [origAnns, setOrigAnns] = useState([]);
     const [currAnns, setCurrAnns] = useState([]);
     // Protospacers
@@ -548,28 +563,62 @@ const Protospacers = ({handleStep, data, setData}) => {
     const [usvData, setUsvData] = useState({});
     const [esvData, setEsvData] = useState({});
 
+    // Load HT-PAMDA data on first load in background
+    useEffect(() => {
+        const HT_PAMDA_URL = "/HT-PAMDA.json";
+        fetch(HT_PAMDA_URL).then(r => r.json()).then(data => {
+            setPAMDA(data);
+            let pamMap = {};
+            for (const [pamVar, pamdaMap] of Object.entries(data)) {
+                for (const [pam, pamda] of Object.entries(pamdaMap)) {
+                    if (pam in pamMap) {
+                        pamMap[pam] = (pamMap[pam].pamda > pamda) ? pamMap[pam] : { pamVar, pamda };
+                    } else {
+                        pamMap[pam] = { pamVar, pamda };
+                    }
+                }
+            }
+            setPamMap(pamMap);
+        });
+    }, []);
     // Set origAnns (originalAnnotations) on first load
     useEffect(() => {
         const uneditedAnns = "annotations" in uneditedData ? uneditedData.annotations : [];
         setOrigAnns(uneditedAnns);
     }, [uneditedData]);
-    // Search for NGG protospacers  FIXME: PAM variants
+    // Search for protospacers
     useEffect(() => {
-        const {minU, preLen, postLen} = minEdit(uneditedData.seq, editedData.seq);
-        const preHom = uneditedData.seq.substring(0, preLen);
-        const postHom = uneditedData.seq.substring(uneditedData.seq.length - postLen);
-        const uLen = minU.length;
+        let PAM_RE;
+        if (!useVars) {
+            setLoadingText("");
+            PAM_RE = /(?=[ACGT]{24}[ACGT]GG[ACGT])/g;
+        } else if (Object.keys(PAMDA).length === 0) {
+            setLoadingText("Loading HT-PAMDA data...");
+            return;
+        } else {
+            setLoadingText("");
+            const aboveCutoff = Object.entries(pamMap)
+                                      .filter(x => (x[1].pamda > pamCutoff))
+                                      .map(x => x[0]);
+            const pamStr = aboveCutoff.join("|");
+            PAM_RE = new RegExp(`(?=[ACGT]{24}(?:${pamStr}))`, "g");
+        }
         let entries = [];
         // FIND FORWARD PROTOSPACERS
-        const fSearch = (preHom.substring(preLen - MAX_EDIT_DIST) +
+        let {minU, preLen, postLen} = minEdit(uneditedData.seq, editedData.seq);
+        let preHom = uneditedData.seq.substring(0, preLen);
+        let postHom = uneditedData.seq.substring(uneditedData.seq.length - postLen);
+        const uLen = minU.length;
+        const fSearch = (preHom.substring(preLen - MAX_EDIT_DIST - 21) +
                          minU.substring(0, Math.min(uLen, 7)) +
                          postHom.substring(0, Math.max(0, 7 - Math.min(uLen, 7))));
         const fIdxs = [...fSearch.matchAll(PAM_RE)].map(x => x.index);
         fIdxs.forEach(x => {
             const direction = "+";
-            const end20 = preLen - MAX_EDIT_DIST + x;
-            const start20 = end20 - 20;
-            const proto30 = uneditedData.seq.substring(start20 - 4, end20 + 6)
+            const idx = x + (preLen - MAX_EDIT_DIST - 21);  // Index of match start in original str
+            const start20 = idx + 4;
+            const end20 = start20 + 20;
+            const proto30 = uneditedData.seq.substring(idx, idx + 30);
             const unedited = uneditedData.seq.substring(start20 - 4);
             const edited = editedData.seq.substring(start20 - 4);
             const id = `${direction}${end20 - 3}`;
@@ -579,54 +628,71 @@ const Protospacers = ({handleStep, data, setData}) => {
         // FIND REVERSE PROTOSPACERS
         const uneditedRC = revcomp(uneditedData.seq);
         const editedRC = revcomp(editedData.seq);
-        const rSearch = (revcomp(postHom).substring(postLen - MAX_EDIT_DIST) +
-                         revcomp(minU).substring(0, Math.min(uLen, 7)) +
-                         revcomp(preHom).substring(0, Math.max(0, 7 - Math.min(uLen, 7))));
+        ( {minU, preLen, postLen} = minEdit(uneditedRC, editedRC) );
+        preHom = uneditedRC.substring(0, preLen);
+        postHom = uneditedRC.substring(uneditedRC.length - postLen);
+        const rSearch = (preHom.substring(preLen - MAX_EDIT_DIST - 21) +
+                         minU.substring(0, Math.min(uLen, 7)) +
+                         postHom.substring(0, Math.max(0, 7 - Math.min(uLen, 7))));
         const rIdxs = [...rSearch.matchAll(PAM_RE)].map(x => x.index);
         rIdxs.forEach(x => {
             const direction = "-";
-            const rcEnd20 = postLen - MAX_EDIT_DIST + x;
-            const rcStart20 = rcEnd20 - 20;
+            const rcIdx = x + (preLen - MAX_EDIT_DIST - 21);  // Index of match start in rc str
+            const rcStart20 = rcIdx + 4;
+            const rcEnd20 = rcStart20 + 20;
+            const proto30 = uneditedRC.substring(rcIdx, rcIdx + 30);
+            const unedited = uneditedRC.substring(rcStart20 - 4);
+            const edited = editedRC.substring(rcStart20 - 4)
             const start20 = uneditedData.seq.length - rcEnd20;
             const end20 = uneditedData.seq.length - rcStart20;
-            const proto30 = uneditedRC.substring(rcStart20 - 4, rcEnd20 + 6);
-            const unedited = uneditedRC.substring(rcStart20 - 4);
-            const edited = editedRC.substring(rcStart20 - 4);
             const id = `${direction}${start20 - 3}`;
             const entry = { id, direction, start20, end20, proto30, unedited, edited };
             entries = [ ...entries, entry ];
         });
         setProtos(entries);
-    }, [uneditedData.seq, editedData.seq]);
+    }, [useVars, PAMDA, pamMap, pamCutoff, uneditedData.seq, editedData.seq]);
     // Protospacer array updates
     useEffect(() => {
-        // Evaluate Doench RS3 scores when protospacer array updates
-        const unchecked = protos.filter(entry => !("rs3" in entry));
-        if (unchecked.length > 0) {
-            setLoadingText("Evaluating protospacers with Doench Rule Set 3...");
-            const checked = protos.filter(entry => "rs3" in entry);
-            const query = protos.map(entry => entry.proto30).join(",");  // TODO? Non-NGG set PAM
-            const url = "https://api.optipri.me/utils/doench_rs3?seqs=" + query;
-            fetch(url).then(resp => {
-                if (!resp.ok) {
-                    setLoadingText("Error evaluating protospacers.");
-                }
-                return resp.json();
-            }).then(data => {
-                if (Array.isArray(data)) {
-                    const update = unchecked.map((e, i) => ({ ...e, rs3: data[i] }));
-                    setProtos(checked.concat(update));
+        // Locally cached Doench rs3 calls
+        const cachedRs3 = async (seqs) => {
+            const isCached = seqs.map(seq => seq in rs3Cache);
+            const noncached = seqs.filter(seq => !(seq in rs3Cache));
+            const hasUpdate = (noncached.length > 0)
+            let rs3s;
+            if (hasUpdate) {
+                setLoadingText("Evaluating protospacers with Doench Rule Set 3...");
+                const URL = "https://api.optipri.me/utils/doench_rs3";
+                const seqs = (noncached.map(seq => (seq.substring(0, 25) + "GG" + seq.substring(27)))
+                                       .join(","));
+                const options = { method: "POST", body: JSON.stringify({ seqs }) };
+                rs3s = await fetch(URL, options).then(resp => {
+                    if (!resp.ok) {
+                        setLoadingText("Error evaluating protospacers.");
+                        throw new Error(JSON.stringify(resp.json()));
+                    }
                     setLoadingText("");
-                } else {
-                    const update = { ...unchecked[0], rs3: data };
-                    setProtos([ ...checked, update ]);
-                    setLoadingText("");
-                }
-            });
-        }
-        // Update protospacer map
-        setProtoMap(Object.fromEntries(protos.map(x => [x.id, x])));
-    }, [protos]);
+                    return resp.json();
+                }).then(data => {
+                    const rs3Data = Array.isArray(data) ? data : [data];
+                    const update = Object.fromEntries(noncached.map((x, i) => [x, rs3Data[i]]));
+                    setRs3Cache(cache => ({ ...cache, ...update }));
+                    return isCached.map((cached, i) => (cached ? rs3Cache[seqs[i]] :
+                                                                 update[seqs[i]]) );
+                }).catch(e => {
+                    console.log(e);
+                });
+            } else {
+                rs3s = rs3Cache;
+            }
+            return rs3s;
+        };
+        cachedRs3(protos.map(x => x.proto30)).then(rs3s => {
+            if (protos.some(x => !(("rs3" in x) && (typeof x.rs3 !== "undefined")))) {
+                setProtos(protos.map(x => ({ ...x, rs3: rs3s[x.proto30] })));
+                setProtoMap(Object.fromEntries(protos.map(x => [x.id, { ...x, rs3: rs3s[x.proto30] }])));
+            }
+        });
+    }, [protos, rs3Cache]);
     // Update annotations
     useEffect(() => {
         const newAnnotations = protos.map(x => {
@@ -634,7 +700,7 @@ const Protospacers = ({handleStep, data, setData}) => {
                           x.id + " (RS3 = " + x.rs3.toFixed(4) + ")" :
                           x.id);
             const direction = x.direction === "+" ? 1 : -1;
-            const color = "rs3" in x ? "lightblue" : "gray";
+            const color = (("rs3" in x) && (typeof x.rs3 !== "undefined")) ? "lightblue" : "gray";
             return { name,
                      start: x.start20,
                      end: x.end20,
@@ -688,8 +754,6 @@ const Protospacers = ({handleStep, data, setData}) => {
         if (selected in protoMap) {
             const entry = protoMap[selected];
             const name = "rs3" in entry ? entry.id + " (RS3 = " + entry.rs3.toFixed(4) + ")" : entry.id;
-            console.log(uneditedData.cdsList);
-            console.log(uneditedData.cdsList.map(updateCDS));
             const uData = { seqData: {
                                 seq: entry.unedited,
                                 cdsList: uneditedData.cdsList.map(x => updateCDS(x, entry))
@@ -716,6 +780,25 @@ const Protospacers = ({handleStep, data, setData}) => {
                     selHandler={selHandler}
                 />
                 <div style={{ width: "100%" }}>{loadingText}</div>
+                <div style={{ width: "100%" }}>
+                    <SwitchField
+                        label="Use PAM variants"
+                        labelPosition="start"
+                        onChange={(e) => { setUseVars(e.target.checked); }}
+                        width="20%"
+                    />
+                    {useVars &&
+                    <SliderField
+                        label="HT-PAMDA cutoff"
+                        min={-2.5}
+                        max={-1.5}
+                        step={-0.25}
+                        defaultValue={-1.75}
+                        value={pamCutoff}
+                        onChange={setPamCutoff}
+                        width="50%"
+                    />}
+                </div>
                 {selected &&
                 <>
                     <h3>Unedited:</h3>
