@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { SeqViz } from "seqviz";
 import { Button, SwitchField, Text } from "@aws-amplify/ui-react";
 
-import { makeCDSAandTs, updateCDS } from "./Utils";
+import { makeCDSAandTs, updateCDS, randomId } from "./Utils";
 
 
 const MAX_UNDO_STACK = 64;
@@ -26,6 +26,11 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
     // CDS => ANNOTATIONS/TRANSLATIONS
     const [annotations, setAnnotations] = useState(seqData.annotations);
     const [translations, setTranslations] = useState(seqData.translations);
+    // Div ID for finding in the DOM
+    const divId = `sv${randomId(10)}`;
+    // Height of inner div containing seqviz component
+    const [updated, setUpdated] = useState(false);
+    const [height, setHeight] = useState(102);
 
     // MANAGE SEQUENCE EDITING FUNCTIONALITY
     useEffect(() => {
@@ -285,9 +290,25 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
         setTranslations([...seqData.translations, ...cdsTranslations]);
     }, [seqData]);
 
+    // Set height based on # of annotation rows
+    useEffect(() => {
+        const timer = setTimeout(() => { setUpdated(true); }, 1);
+        return () => clearTimeout(timer);
+    }, [annotations]);
+    useEffect(() => {
+        if (updated) {
+            const div = document.querySelector(`#${divId}`).querySelector(".la-vz-seqblock");
+            if (div !== null) {
+                const aRows = div.querySelectorAll(".la-vz-linear-annotation-row").length;
+                console.log(aRows);
+                setHeight(102 + 16 * aRows);
+            }
+        }
+    }, [updated, divId]);
+
     return (
-        <div style={{ height: "100%", verticalAlign: "top" }}>
-            <div style={{ height: "150px", width: "100%", display: "block" }}>
+        <div style={{ height: "100%", verticalAlign: "top" }} id={divId}>
+            <div style={{ height: `${height}px`, width: "100%", display: "block" }}>
                 {seqData.seq !== "" &&  // Because SeqViz refuses to update when seq is ""
                 <SeqViz
                     { ...seqData }

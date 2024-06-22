@@ -280,3 +280,13 @@ const coordRe = /[cC]\.(\d+|\*\d+|-\d+)([+-]\d+)?/;
 export const parseHGVS = (geneData, hgvs) => {
 
 };
+
+/*
+ * Make a random string for an ID
+ */
+export const randomId = (len) => {
+    const charSet = "0123456789ABCDEF";
+    const chars = [ ...Array(len) ].map(_ => (
+        charSet.charAt(Math.floor(Math.random() * charSet.length))));
+    return chars.join("");
+};
