@@ -76,7 +76,7 @@ const editSegments = (seq, cds) => {
     return segObjects;
 };
 
-export default function EditedSeqViz({ seqData }) {
+export default function EditedSeqViz({ seqData, highlights }) {
     // Annotation management
     const [origAnns, setOrigAnns] = useState([]);
     const [currAnns, setCurrAnns] = useState([]);
@@ -126,10 +126,10 @@ export default function EditedSeqViz({ seqData }) {
             const annotations = (Array.from(document.querySelectorAll(".la-vz-annotation"))
                                                     .map(x => x.parentElement));
             const annLabels = annotations.map(x => {
-                    const label = x.childNodes[0].innerHTML;
-                    const id = x.id;
-                    return [label, id];
-                });
+                const label = x.childNodes[0].innerHTML;
+                const id = x.id;
+                return [label, id];
+            });
             setMainAnnMap(Object.fromEntries(annLabels.filter(x => CODON_RE.test(x[0]))));
             setMenuAnnMap(Object.fromEntries(annLabels.filter(x => MENU_RE.test(x[0]))));
             setUpdated(false);
@@ -216,6 +216,7 @@ export default function EditedSeqViz({ seqData }) {
                     { ...seqData }
                     annotations={currAnns}
                     translations={translations}
+                    highlights={highlights}
                     viewer="linear"
                     showComplement={false}
                     showIndex={false}

@@ -302,6 +302,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
                 const aRows = div.querySelectorAll(".la-vz-linear-annotation-row").length;
                 setHeight(102 + 16 * aRows);
             }
+            setUpdated(false);
         }
     }, [updated, divId]);
 

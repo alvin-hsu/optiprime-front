@@ -5,6 +5,7 @@ import {
     Autocomplete,
     Button,
     Divider,
+    Heading,
     Input,
     SelectField,
     SliderField,
@@ -622,7 +623,8 @@ const Protospacers = ({handleStep, data, setData}) => {
             const unedited = uneditedData.seq.substring(start20 - 4);
             const edited = editedData.seq.substring(start20 - 4);
             const id = `${direction}${end20 - 3}`;
-            const entry = { id, direction, start20, end20, proto30, unedited, edited };
+            const pam = uneditedData.seq.substring(idx + 24, idx + 28);
+            const entry = { id, direction, start20, end20, proto30, unedited, edited, pam };
             entries = [ ...entries, entry ];
         });
         // FIND REVERSE PROTOSPACERS
@@ -646,7 +648,8 @@ const Protospacers = ({handleStep, data, setData}) => {
             const start20 = uneditedData.seq.length - rcEnd20;
             const end20 = uneditedData.seq.length - rcStart20;
             const id = `${direction}${start20 - 3}`;
-            const entry = { id, direction, start20, end20, proto30, unedited, edited };
+            const pam = uneditedRC.substring(rcIdx + 24, rcIdx + 28);
+            const entry = { id, direction, start20, end20, proto30, unedited, edited, pam };
             entries = [ ...entries, entry ];
         });
         setProtos(entries);
@@ -700,7 +703,13 @@ const Protospacers = ({handleStep, data, setData}) => {
                           x.id + " (RS3 = " + x.rs3.toFixed(4) + ")" :
                           x.id);
             const direction = x.direction === "+" ? 1 : -1;
-            const color = (("rs3" in x) && (typeof x.rs3 !== "undefined")) ? "lightblue" : "gray";
+            const pamInfo = pamMap[x.pam];
+            let color;
+            if (("rs3" in x) && (typeof x.rs3 !== "undefined")) {
+                color = (pamInfo.pamVar === "SpNGG") ? "lightblue" : "pink";
+            } else {
+                color = "gray";
+            }
             return { name,
                      start: x.start20,
                      end: x.end20,
@@ -709,7 +718,7 @@ const Protospacers = ({handleStep, data, setData}) => {
         });
         const annotations = [ ...origAnns, ...newAnnotations ]
         setCurrAnns(annotations);
-    }, [origAnns, protos]);
+    }, [origAnns, pamMap, protos]);
     // For updating CDS data to entries
     const updateCDS = (cds, ps) => {
         // Protospacer info
@@ -743,31 +752,48 @@ const Protospacers = ({handleStep, data, setData}) => {
         return { name: ps.name, direction: newDir,
                  start, end, frame }
     };
+    // Clear state whenever useVars or pamCutoff updates
+    useEffect(() => {
+        setSelected("");
+        setUsvData({});
+        setEsvData({});
+    }, [useVars, pamCutoff]);
     // Handle clicking on selections
     const selHandler = (e) => {
         const name = e.name.split(" ")[0];
         if (PROTO_RE.test(name) && (name in protoMap)) {
             setSelected(name);
+            setUsvData({});
+            setEsvData({});
         }
     };
     useEffect(() => {
         if (selected in protoMap) {
             const entry = protoMap[selected];
             const name = "rs3" in entry ? entry.id + " (RS3 = " + entry.rs3.toFixed(4) + ")" : entry.id;
+            const {minU, minE, preLen} = minEdit(entry.unedited, entry.edited);
+            let color;
+            if (minU.length === 0) { color = "lime"; }
+            else if (minE.length === 0) { color = "pink"; }
+            else { color = "cyan"; }
+            const uHighlight = { start: preLen, end: preLen + minU.length, color: color };
+            const eHighlight = { start: preLen, end: preLen + minE.length, color: color };
             const uData = { seqData: {
                                 seq: entry.unedited,
                                 cdsList: uneditedData.cdsList.map(x => updateCDS(x, entry))
                             },
-                            name }
+                            name,
+                            pamVar: pamMap[entry.pam].pamVar,
+                            highlights: (minU.length === 0) ? [] : [uHighlight] };
             const eData = { seqData: {
                                 seq: entry.edited,
                                 cdsList: editedData.cdsList.map(x => updateCDS(x, entry))
-                            }
-                          }
+                            },
+                            highlights: (minE.length === 0) ? [] : [eHighlight] };
             setUsvData(uData);
             setEsvData(eData);
         }
-    }, [protoMap, selected, protos, editedData.cdsList, uneditedData.cdsList]);
+    }, [protoMap, pamMap, selected, protos, editedData.cdsList, uneditedData.cdsList]);
 
     return (
         <>
@@ -780,36 +806,46 @@ const Protospacers = ({handleStep, data, setData}) => {
                     selHandler={selHandler}
                 />
                 <div style={{ width: "100%" }}>{loadingText}</div>
-                <div style={{ width: "100%" }}>
-                    <SwitchField
-                        label="Use PAM variants"
-                        labelPosition="start"
-                        onChange={(e) => { setUseVars(e.target.checked); }}
-                        width="20%"
-                    />
+                <div style={{
+                    width: "100%"
+                }}>
+                    <div style={{
+                        width: "11%",
+                        display: "inline-flex",
+                        verticalAlign: "middle"
+                    }}>
+                        <SwitchField
+                            label="Use PAM variants"
+                            labelPosition="start"
+                            onChange={(e) => { setUseVars(e.target.checked); }}
+                        />
+                    </div>
                     {useVars &&
-                    <SliderField
-                        label="HT-PAMDA cutoff"
-                        min={-2.5}
-                        max={-1.5}
-                        step={-0.25}
-                        defaultValue={-1.75}
-                        value={pamCutoff}
-                        onChange={setPamCutoff}
-                        width="50%"
-                    />}
+                    <div style={{
+                        width: "30%",
+                        display: "inline-flex",
+                        verticalAlign: "middle"
+                    }}>
+                        <SliderField
+                            label="PAM flexibility"
+                            min={1.5} max={2.5} step={0.25} defaultValue={1.75}
+                            value={-pamCutoff} onChange={(x => { setPamCutoff(-x); })}
+                            labelHidden={true} isValueHidden={true} width="100%"
+                        />
+                    </div>
+                    }
                 </div>
                 {selected &&
-                <>
-                    <h3>Unedited:</h3>
+                <div>
+                    <Heading level={6}>Unedited:</Heading>
                     <UneditedSeqViz
                         { ...usvData }
                     />
-                    <h3>Edited:</h3>
+                    <Heading level={6}>Edited:</Heading>
                     <EditedSeqViz
                         { ...esvData }
                     />
-                </>
+                </div>
                 }
             </div>
         </>
