@@ -3,19 +3,14 @@ import MediaQuery from "react-responsive"
 
 import "./Header.css";
 
-function NavButton({ link, text }) {
-    function handleClick() {
-        window.location.href = link
-    }
-    return (<button onClick={handleClick}>{text}</button>)
-}
+const NavButton = ({ link, text }) => {
+    const handleClick = () => { window.location.href = link; };
+    return (<button onClick={handleClick}>{text}</button>);
+};
 
-function NavBar() {
+const NavBar = () => {
     const [isNavVisible, setIsNavVisible] = useState(false);
-    const toggleNav = () => {
-        console.log('clicked!');
-        setIsNavVisible(!isNavVisible);
-    };
+    const toggleNav = () => { setIsNavVisible(!isNavVisible); };
     return (
         <div className="menu-bar">
             <MediaQuery minWidth={1000}>
@@ -47,7 +42,7 @@ export default function Header() {
     return (
         <div className="Header">
             <div id="logo">
-                <img src="/op-logo-300ppi.png" alt="OptiPrime"/>
+                <img src="./op-logo-300ppi.png" alt="OptiPrime"/>
             </div>
             <NavBar />
         </div>

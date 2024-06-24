@@ -4,15 +4,10 @@ import { Button } from "@aws-amplify/ui-react";
 
 export default function Home() {
     // TODO: LocalStorage to store previous predictions
-    let navigate = useNavigate();
-
-    const goToDesign = () => {
-        navigate("./design")
-    };
-
+    const navigate = useNavigate();
     return (
         <div>
-          <Button onClick={goToDesign}>
+          <Button onClick={() => navigate("./design")}>
               Start designing!
           </Button>
         </div>
