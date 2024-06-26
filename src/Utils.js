@@ -112,6 +112,10 @@ export const fetchSequenceFromCoords = (coords, contextLen) => {
  * 
  */
 export const getContextExonTranslations = (geneData, target, contextLen) => {
+    if (typeof geneData === "undefined") {
+        return [];
+    }
+
     const contextStart = Number(target) - Number(contextLen);
     const contextEnd = Number(target) + Number(contextLen);
 
@@ -275,4 +279,14 @@ export const revcomp = (seq) => {
 const coordRe = /[cC]\.(\d+|\*\d+|-\d+)([+-]\d+)?/;
 export const parseHGVS = (geneData, hgvs) => {
 
+};
+
+/*
+ * Make a random string for an ID
+ */
+export const randomId = (len) => {
+    const charSet = "0123456789ABCDEF";
+    const chars = [ ...Array(len) ].map(_ => (
+        charSet.charAt(Math.floor(Math.random() * charSet.length))));
+    return chars.join("");
 };
