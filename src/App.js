@@ -10,6 +10,7 @@ import Home from "./Home"
 import OtherLinks from "./Other";
 import SeqVizTest from "./SeqVizTest";
 import REST from "./REST"
+import IDPResponse from "./IDPResponse"
 
 import "./App.css"
 import "./Animations.css"
@@ -34,6 +35,7 @@ function App() {
             <Route path="/other" element={<OtherLinks />}/>
             <Route path="/design" element={<Design />} />
             <Route path="/seqviz" element={<SeqVizTest />} />
+            <Route path="/idpresponse" element={<IDPResponse />} />
           </Routes>
         </CSSTransition>
       </SwitchTransition>
