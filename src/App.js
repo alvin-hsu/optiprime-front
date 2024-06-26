@@ -11,7 +11,7 @@ import Jobs from "./Jobs";
 import OtherLinks from "./Other";
 import SeqVizTest from "./SeqVizTest";
 import REST from "./REST";
-import IDPResponse from "./IDPResponse"
+import IDPResponse from "./IDPResponse";
 
 import "./Animations.css"
 

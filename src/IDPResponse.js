@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
 
 /*
- * Handles google OAuth2 response - stores the access token in a cookie and redirects to the home page.
+ * Handles google OAuth2 response - stores the access token in a cookie and redirects to page in 'state' parameter
  * 
  * AWS was configured to redirect users to this page after successful login:
  * https://optipri.me/idpresponse#access_token=XXX&id_token=XXX&token_type=Bearer&expires_in=XXX
@@ -22,12 +22,16 @@ const IDPResponse = () => {
     const hash = window.location.hash.substring(1);
     const params = new URLSearchParams(hash);
     const accessToken = params.get('access_token');
+    const redirectUrl = params.get('state');
 
     if (accessToken) {
       Cookies.set('jwt', accessToken, { secure: true, sameSite: 'Strict' });
       console.log('Got Access token: ', accessToken);
-      navigate('/');
-
+      if (redirectUrl) {
+        navigate(redirectUrl);
+      } else {
+        navigate('/');
+      }
     } else {
       console.error('Access token not found in the URL');
     }
