@@ -21,19 +21,19 @@ const IDPResponse = () => {
   useEffect(() => {
     const hash = window.location.hash.substring(1);
     const params = new URLSearchParams(hash);
-    const idToken = params.get('id_token');
+    const accessToken = params.get('access_token');
     const redirectUrl = params.get('state');
 
-    if (idToken) {
-      Cookies.set('jwt', idToken, { secure: true, sameSite: 'Strict' });
-      console.log('Got id_token: ', idToken);
+    if (accessToken) {
+      Cookies.set('jwt', accessToken, { secure: true, sameSite: 'Strict' });
+      console.log('Got id_token: ', accessToken);
       if (redirectUrl) {
         navigate(redirectUrl);
       } else {
         navigate('/');
       }
     } else {
-      console.error('id_token not found in the URL');
+      console.error('access_token not found in the URL');
     }
   }, [navigate]);
 
