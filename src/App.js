@@ -3,14 +3,15 @@ import { SwitchTransition, CSSTransition } from "react-transition-group";
 import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 import "@aws-amplify/ui-react/styles.css";
 
-import About from "./About";
-import Design from "./Design";
-import Header from "./Header";
+import TOS from "./TOS";
+import REST from "./REST";
 import Home from "./Home";
 import Jobs from "./Jobs";
+import About from "./About";
+import Header from "./Header";
+import Design from "./Design";
 import OtherLinks from "./Other";
 import SeqVizTest from "./SeqVizTest";
-import REST from "./REST";
 import IDPResponse from "./IDPResponse";
 
 import "./Animations.css"
@@ -37,6 +38,7 @@ function App() {
                             <Route path="/jobs" element={<Jobs />} />
                             <Route path="/seqviz" element={<SeqVizTest />} />
                             <Route path="/idpresponse" element={<IDPResponse />} />
+                            <Route path="/terms-of-service" element={<TOS />} />
                         </Routes>
                     </CSSTransition>
                 </SwitchTransition>
