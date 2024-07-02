@@ -22,7 +22,6 @@ import {
     minEdit,
     revcomp,
     updateCDS,
-    parseHGVS
 }
     from "./Utils";
 import EditableSeqViz from "./EditableSeqViz";
@@ -104,7 +103,7 @@ const Human = ({ handleStep, data, setData }) => {
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             if (hgvs === "") { return; }
-            const result = parseHGVS(geneData, hgvs);
+            return;
             console.log(result);
         }, 200);
         return () => clearTimeout(timeoutId);
