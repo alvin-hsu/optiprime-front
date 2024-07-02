@@ -17,7 +17,9 @@ const TOS = () => {
                      method: "POST" })
         .then((resp) => {
             console.log(resp);
-            Cookies.set('tos', resp.body, { secure: true, sameSite: 'Strict' });
+            const blob = resp.blob();
+            console.log(blob);
+            Cookies.set('tos', blob, { secure: true, sameSite: 'Strict' });
             navigate("/");
         }));
     };
