@@ -291,6 +291,8 @@ export const randomId = (len) => {
  */
 export const verifyRSASignature = (publicKey, sig, msg) => {
     const rsaPubKey = KEYUTIL.getKey(publicKey);  // Parse PEM
-    const hashValue = KJUR.crypto.Util.hashString(msg, "sha256");  // Compute hash of message
-    return KJUR.crypto.Signature.verify(hashValue, sig, rsaPubKey);
+    const sigObj = new KJUR.crypto.Signature({ alg: "SHA256withRSA" })
+    sigObj.init(rsaPubKey);
+    sigObj.updateString(msg);
+    return sigObj.verify(sig);
 }
