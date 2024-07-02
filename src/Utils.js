@@ -1,3 +1,5 @@
+import { KJUR, KEYUTIL } from "jsrsasign";
+
 import "./Utils.css";
 
 // ****************************** GENOMIC INFO APIs ****************************** 
@@ -274,14 +276,6 @@ export const revcomp = (seq) => {
 };
 
 /*
- * Get genomic coordinates and alleles based on HGVS nomenclature for genes.
- */
-const coordRe = /[cC]\.(\d+|\*\d+|-\d+)([+-]\d+)?/;
-export const parseHGVS = (geneData, hgvs) => {
-
-};
-
-/*
  * Make a random string for an ID
  */
 export const randomId = (len) => {
@@ -290,3 +284,13 @@ export const randomId = (len) => {
         charSet.charAt(Math.floor(Math.random() * charSet.length))));
     return chars.join("");
 };
+
+/*
+ * Check that an RSA signature is valid. Probably not 100% secure but we'll have
+ * backend checks as well.
+ */
+export const verifyRSASignature = (publicKey, sig, msg) => {
+    const rsaPubKey = KEYUTIL.getKey(publicKey);  // Parse PEM
+    const hashValue = KJUR.crypto.Util.hashString(msg, "sha256");  // Compute hash of message
+    return KJUR.crypto.Signature.verify(hashValue, sig, rsaPubKey);
+}

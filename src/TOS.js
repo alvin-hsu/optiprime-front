@@ -7,14 +7,6 @@ const TOS = () => {
     setIsChecked(event.target.checked);
   };
 
-  const initiateLogin = () => {
-    const clientId = '55kpv1cuiekc2drftj2ftr71nu';
-    const redirectUri = encodeURIComponent('https://optipri.me/idpresponse');
-    const loginUrl = `https://optiprime.auth.us-east-2.amazoncognito.com/oauth2/authorize?response_type=token&client_id=${clientId}&redirect_uri=${redirectUri}`;
-
-    window.location.href = loginUrl;
-  };
-
   return (
     <div>
       <h1>Terms of Service</h1>
@@ -33,8 +25,7 @@ const TOS = () => {
         I agree to the Terms of Service
       </label>
       <br />
-      <button 
-        onClick={initiateLogin} 
+      <button
         disabled={!isChecked}
       >
         Login with Google
