@@ -29,11 +29,11 @@ const Home = () => {
     if (!jwt) {
         return <Login />;
     }
-    console.log(jwt);
     const tokenInfo = decodeToken(jwt);
     console.log(tokenInfo);
     const username = tokenInfo['username'];
-    const tosSig = 'tos_sig' in tokenInfo ? tokenInfo['tos_sig'] : undefined;
+    const tos = Cookies.get('tos');
+    const tosSig = (tos !== null) ? tos : tokenInfo['tos_sig'];
     if (!((typeof tosSig !== "undefined") &&
           (typeof username !== "undefined") &&
           verifyRSASignature(publicKey, tosSig, username))) {

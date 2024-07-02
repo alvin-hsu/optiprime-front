@@ -1,9 +1,7 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
 
 const TOS = () => {
-    const navigate = useNavigate();
     const [isChecked, setIsChecked] = useState(false);
 
     const handleCheckboxChange = (event) => {
@@ -15,12 +13,10 @@ const TOS = () => {
         const url = "https://api.optipri.me/accept_tos";
        (fetch(url, { headers: { "Authorization": token },
                      method: "POST" })
-        .then(async (resp) => {
-            console.log(resp);
-            const blob = await resp.blob();
-            console.log(blob);
-            Cookies.set('tos', blob, { secure: true, sameSite: 'Strict' });
-            navigate("/");
+        .then(resp => resp.text())
+        .then(tos => {
+            Cookies.set('tos', tos, { secure: true, sameSite: 'Strict' });
+            window.location.reload();
         }));
     };
 
