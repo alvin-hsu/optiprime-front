@@ -14,9 +14,10 @@ export default function Jobs() {
                 caption=""
                 size="small"
                 highlightOnHover={true}
+                width="80%"
             >
-                <TableHead>
-                  <TableRow>
+                <TableHead borderWidth="1px" borderColor="black">
+                  <TableRow style={{ borderColor: "black", borderWidth: "2px" }}>
                     <TableCell as="th">Citrus</TableCell>
                     <TableCell as="th">Stone Fruit</TableCell>
                     <TableCell as="th">Berry</TableCell>
