@@ -9,8 +9,7 @@ const Login = () => {
         const loginUrl = (`https://auth.optipri.me/oauth2/authorize?
                            response_type=token&
                            client_id=${clientId}&
-                           redirect_uri=${redirectUri}&
-                           prompt=select_account`
+                           redirect_uri=${redirectUri}`
                           .replace(/s+/g, ''));
         window.location.href = loginUrl;
     };

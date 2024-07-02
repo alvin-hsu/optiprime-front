@@ -3,6 +3,7 @@ import { Button } from "@aws-amplify/ui-react";
 import Cookies from "js-cookie";
 
 import Login from "./Login";
+import Logout from "./Logout";
 import TOS from "./TOS";
 import { verifyRSASignature } from "./Utils";
 
@@ -24,13 +25,10 @@ UCf362qroaxEgAISzmOuUasCAwEAAQ==
 `;
 
 export default function Home() {
-    const userName = Cookies.get('')
     const jwt = Cookies.get('jwt');
-    const tos = Cookies.get('tos');
-    return <Login />
     if (!jwt) {
-        return <Login/>;
-    } else if (verifyRSASignature(publicKey, tos, userName)) {
-        return <TOS />;
+        return <Login />;
+    } else {
+        return <Logout />
     }
 }
