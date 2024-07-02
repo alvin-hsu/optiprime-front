@@ -1,5 +1,5 @@
 import React from "react";
-import Button from "@aws-amplify/ui-react";
+import { Button } from "@aws-amplify/ui-react";
 import Cookies from "js-cookie"
 
 const Logout = () => {
