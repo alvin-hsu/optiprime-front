@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Cookies from 'js-cookie';
+import React, { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import Cookies from "js-cookie";
 
 /*
  * Handles google OAuth2 response - stores the access token in a cookie and redirects to page in 'state' parameter
@@ -19,11 +19,8 @@ const IDPResponse = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    console.log(window.location);
     const hash = window.location.hash.substring(1);
-    console.log(hash);
     const params = new URLSearchParams(hash);
-    console.log(params);
     const accessToken = params.get('access_token');
     const redirectUrl = params.get('state');
 

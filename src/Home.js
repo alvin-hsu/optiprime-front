@@ -1,6 +1,6 @@
 import React from "react";
-import { Button } from "@aws-amplify/ui-react";
 import Cookies from "js-cookie";
+import { decodeToken } from "react-jwt";
 
 import Login from "./Login";
 import Logout from "./Logout";
@@ -24,11 +24,22 @@ UCf362qroaxEgAISzmOuUasCAwEAAQ==
 -----END PUBLIC KEY-----
 `;
 
-export default function Home() {
+const Home = () => {
     const jwt = Cookies.get('jwt');
     if (!jwt) {
         return <Login />;
-    } else {
-        return <Logout />
     }
+    console.log(jwt);
+    const tokenInfo = decodeToken(jwt);
+    console.log(tokenInfo);
+    const username = tokenInfo['username'];
+    const tosSig = 'tos_sig' in tokenInfo ? tokenInfo['tos_sig'] : undefined;
+    if (!((typeof tosSig !== "undefined") &&
+          (typeof username !== "undefined") &&
+          verifyRSASignature(publicKey, tosSig, username))) {
+        return (<> <TOS /><Logout /> </>);
+    }
+    return (<>Success<Logout /></>);
 }
+
+export default Home;

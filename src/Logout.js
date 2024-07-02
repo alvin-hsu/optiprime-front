@@ -14,7 +14,7 @@ const Logout = () => {
         Cookies.remove("jwt");
         window.location.href = logoutUrl;
     };
-    return <Button onClick={initiateLogout} label="Logout" />;
+    return (<><Button onClick={initiateLogout} label="Logout">Logout</Button></>);
 };
 
 export default Logout;
