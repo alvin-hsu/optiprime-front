@@ -15,9 +15,9 @@ const TOS = () => {
         const url = "https://api.optipri.me/accept_tos";
        (fetch(url, { headers: { "Authorization": token },
                      method: "POST" })
-        .then((resp) => {
+        .then(async (resp) => {
             console.log(resp);
-            const blob = resp.blob();
+            const blob = await resp.blob();
             console.log(blob);
             Cookies.set('tos', blob, { secure: true, sameSite: 'Strict' });
             navigate("/");
