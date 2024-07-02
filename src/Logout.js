@@ -4,10 +4,12 @@ import Cookies from "js-cookie"
 
 const Logout = () => {
     const initiateLogout = () => {
-        const redirectUri = encodeURIComponent('https://optipri.me');
+        const clientId = '55kpv1cuiekc2drftj2ftr71nu';
+        const logoutUri = encodeURIComponent('https://optipri.me');
         // noinspection UnnecessaryLocalVariableJS
         const logoutUrl = (`https://auth.optipri.me/logout?
-                            redirect_uri=${redirectUri}`
+                            client_id=${clientId}&
+                            logout_uri=${logoutUri}`
                            .replace(/s+/g, ''));
         Cookies.remove("jwt");
         window.location.href = logoutUrl;
