@@ -1,4 +1,5 @@
-import { KJUR, KEYUTIL } from "jsrsasign";
+import { Buffer } from "buffer";
+import { KJUR } from "jsrsasign";
 
 import "./Utils.css";
 
@@ -289,10 +290,10 @@ export const randomId = (len) => {
  * Check that an RSA signature is valid. Probably not 100% secure but we'll have
  * backend checks as well.
  */
-export const verifyRSASignature = (publicKey, sig, msg) => {
-    const rsaPubKey = KEYUTIL.getKey(publicKey);  // Parse PEM
-    const sigObj = new KJUR.crypto.Signature({ alg: "SHA256withRSA" })
-    sigObj.init(rsaPubKey);
-    sigObj.updateString(msg);
-    return sigObj.verify(sig);
+export const verifyRSASignature = (publicKey, b64Sig, msgStr) => {
+    const sigObj = new KJUR.crypto.Signature({ alg: "SHA256withRSA" });
+    const hexSig = Buffer.from(b64Sig, "base64").toString("hex");
+    sigObj.init(publicKey);
+    sigObj.updateString(msgStr);
+    return sigObj.verify(hexSig);
 }
