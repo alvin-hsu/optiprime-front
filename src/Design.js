@@ -104,7 +104,6 @@ const Human = ({ handleStep, data, setData }) => {
         const timeoutId = setTimeout(() => {
             if (hgvs === "") { return; }
             return;
-            console.log(result);
         }, 200);
         return () => clearTimeout(timeoutId);
     }, [geneData, hgvs]);
