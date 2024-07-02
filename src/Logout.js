@@ -10,7 +10,7 @@ const Logout = () => {
         const logoutUrl = (`https://auth.optipri.me/logout?
                             client_id=${clientId}&
                             logout_uri=${logoutUri}`
-                           .replace(/s+/g, ''));
+                           .replace(/\s+/g, ''));
         Cookies.remove("jwt");
         window.location.href = logoutUrl;
     };

@@ -10,7 +10,7 @@ const Login = () => {
                            response_type=token&
                            client_id=${clientId}&
                            redirect_uri=${redirectUri}`
-                          .replace(/s+/g, ''));
+                          .replace(/\s+/g, ''));
         window.location.href = loginUrl;
     };
     return <GoogleButton onClick={initiateLogin} />;
