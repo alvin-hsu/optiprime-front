@@ -13,8 +13,12 @@ const TOS = () => {
         const url = "https://api.optipri.me/accept_tos";
        (fetch(url, { headers: { "Authorization": token },
                      method: "POST" })
-        .then(resp => resp.text())
+        .then(resp => {
+            console.log(resp);
+            return resp.text();
+        })
         .then(tos => {
+            console.log(tos);
             Cookies.set('tos', tos, { secure: true, sameSite: 'Strict' });
             window.location.reload();
         }));
