@@ -46,7 +46,7 @@ const IDPResponse = () => {
         Cookies.set("id_token", idToken, { secure: true,
                                            sameSite: "Strict",
                                            expires: expTime });
-        if (tos !== null) {
+        if (typeof tos !== "undefined") {
             Cookies.set("tos", tos, { secure: true,
                                       sameSite: "Strict",
                                       expires: expTime });
