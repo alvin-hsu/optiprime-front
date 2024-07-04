@@ -9,7 +9,7 @@ const TOS = () => {
     };
 
     const acceptTOS = (_) => {
-        const token = Cookies.get("jwt");
+        const token = Cookies.get("access_token");
         const url = "https://api.optipri.me/accept_tos";
        (fetch(url, { headers: { "Authorization": token },
                      method: "POST" })

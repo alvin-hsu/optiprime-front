@@ -24,7 +24,6 @@ const IDPResponse = () => {
         const idToken = params.get("id_token");
         const idJwt = decodeToken(idToken);
         const acToken = params.get("access_token");
-        const acJwt = decodeToken(acToken);
         const redirectUrl = params.get("state");
         if (!(idToken && acToken)) {
             console.log("id_token or access_token not found in the URL");
@@ -38,7 +37,7 @@ const IDPResponse = () => {
         console.log("Got id_token", idToken);
         console.log("Got access_token", acToken);
         // Parse out useful fields from JWT
-        const expTime = new Date(1000 * acJwt["exp"]);
+        const expTime = new Date(1000 * idJwt["exp"]);
         const tos = idJwt["tos"];
         Cookies.set("ac_token", acToken, { secure: true,
                                            sameSite: "Strict",

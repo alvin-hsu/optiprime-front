@@ -31,12 +31,16 @@ const Home = () => {
     }
     const idJwt = decodeToken(idToken);
     const username = idJwt["username"];
-    const tos = Cookies.get("tos");
-    const tosSig = (tos !== null) ? tos : idJwt["tos"];
-    Cookies.set("tos", tosSig, { secure: true, sameSite: "Strict" });
-    if (!( (typeof tosSig !== "undefined") &&
-           (typeof username !== "undefined") &&
-           verifyRSASignature(publicKey, tosSig, username) )) {
+    const tos = (typeof Cookies.get("tos") !== "undefined")
+                ? Cookies.get("tos")
+                : idJwt["tos"];
+    if (typeof tos !== "undefined") {
+        const expTime = new Date(1000 * idJwt["exp"]);
+        Cookies.set("tos", tos, { secure: true, sameSite: "Strict", expiry: expTime });
+    }
+    if (!( (typeof username !== "undefined") &&
+           (typeof tos !== "undefined") &&
+           verifyRSASignature(publicKey, tos, username) )) {
         return (<> <TOS /><Logout /> </>);
     }
     return (<>Success<Logout /></>);
