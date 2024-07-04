@@ -25,18 +25,18 @@ UCf362qroaxEgAISzmOuUasCAwEAAQ==
 `;
 
 const Home = () => {
-    const jwt = Cookies.get('jwt');
-    if (!jwt) {
+    const idToken = Cookies.get("id_token");
+    if (!idToken) {
         return <Login />;
     }
-    const tokenInfo = decodeToken(jwt);
-    console.log(tokenInfo);
-    const username = tokenInfo['username'];
-    const tos = Cookies.get('tos');
-    const tosSig = (tos !== null) ? tos : tokenInfo['tos_sig'];
-    if (!((typeof tosSig !== "undefined") &&
-          (typeof username !== "undefined") &&
-          verifyRSASignature(publicKey, tosSig, username))) {
+    const idJwt = decodeToken(idToken);
+    const username = idJwt["username"];
+    const tos = Cookies.get("tos");
+    const tosSig = (tos !== null) ? tos : idJwt["tos"];
+    Cookies.set("tos", tosSig, { secure: true, sameSite: "Strict" });
+    if (!( (typeof tosSig !== "undefined") &&
+           (typeof username !== "undefined") &&
+           verifyRSASignature(publicKey, tosSig, username) )) {
         return (<> <TOS /><Logout /> </>);
     }
     return (<>Success<Logout /></>);

@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
+import { decodeToken } from "react-jwt";
 
 /*
  * Handles google OAuth2 response - stores the access token in a cookie and redirects to page in 'state' parameter
@@ -14,30 +15,50 @@ import Cookies from "js-cookie";
  * OptiPrimeAPI -> Authorizers -> Optiprime-authorizer -> Token Source
  * 
  */
-
 const IDPResponse = () => {
-  const navigate = useNavigate();
+    const navigate = useNavigate();
 
-  useEffect(() => {
-    const hash = window.location.hash.substring(1);
-    const params = new URLSearchParams(hash);
-    const accessToken = params.get('access_token');
-    const redirectUrl = params.get('state');
+    useEffect(() => {
+        const hash = window.location.hash.substring(1);
+        const params = new URLSearchParams(hash);
+        const idToken = params.get("id_token");
+        const idJwt = decodeToken(idToken);
+        const acToken = params.get("access_token");
+        const acJwt = decodeToken(acToken);
+        const redirectUrl = params.get("state");
+        if (!(idToken && acToken)) {
+            console.log("id_token or access_token not found in the URL");
+            if (redirectUrl) {
+                navigate(redirectUrl);
+            } else {
+                navigate("/");
+            }
+            return;
+        }
+        console.log("Got id_token", idToken);
+        console.log("Got access_token", acToken);
+        // Parse out useful fields from JWT
+        const expTime = new Date(1000 * acJwt["exp"]);
+        const tos = idJwt["tos"];
+        Cookies.set("ac_token", acToken, { secure: true,
+                                           sameSite: "Strict",
+                                           expires: expTime });
+        Cookies.set("id_token", idToken, { secure: true,
+                                           sameSite: "Strict",
+                                           expires: expTime });
+        if (tos !== null) {
+            Cookies.set("tos", tos, { secure: true,
+                                      sameSite: "Strict",
+                                      expires: expTime });
+        }
+        if (redirectUrl) {
+            navigate(redirectUrl);
+        } else {
+            navigate("/");
+        }
+    }, [navigate]);
 
-    if (accessToken) {
-      Cookies.set('jwt', accessToken, { secure: true, sameSite: 'Strict' });
-      console.log('Got id_token: ', accessToken);
-      if (redirectUrl) {
-        navigate(redirectUrl);
-      } else {
-        navigate('/');
-      }
-    } else {
-      console.error('access_token not found in the URL');
-    }
-  }, [navigate]);
-
-  return <div>Loading...</div>;
+    return <div>Loading...</div>;
 };
 
 export default IDPResponse;
