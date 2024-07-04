@@ -30,14 +30,10 @@ const Home = () => {
         return <Login />;
     }
     const idJwt = decodeToken(idToken);
-    const username = idJwt["username"];
+    const username = idJwt["cognito:username"];
     const tos = (typeof Cookies.get("tos") !== "undefined")
                 ? Cookies.get("tos")
                 : idJwt["tos"];
-    if (typeof tos !== "undefined") {
-        const expTime = new Date(1000 * idJwt["exp"]);
-        Cookies.set("tos", tos, { secure: true, sameSite: "Strict", expiry: expTime });
-    }
     if (!( (typeof username !== "undefined") &&
            (typeof tos !== "undefined") &&
            verifyRSASignature(publicKey, tos, username) )) {
