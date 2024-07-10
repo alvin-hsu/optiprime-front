@@ -31,6 +31,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
     // Height of inner div containing seqviz component
     const [updated, setUpdated] = useState(false);
     const [height, setHeight] = useState(102);
+    const [width, setWidth] = useState(10);
 
     // MANAGE SEQUENCE EDITING FUNCTIONALITY
     useEffect(() => {
@@ -290,7 +291,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
         setTranslations([...seqData.translations, ...cdsTranslations]);
     }, [seqData]);
 
-    // Set height based on # of annotation rows
+    // Set height/width based on # of annotation rows
     useEffect(() => {
         const timer = setTimeout(() => { setUpdated(true); }, 1);
         return () => clearTimeout(timer);
@@ -300,25 +301,33 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
             const div = document.querySelector(`#${divId}`).querySelector(".la-vz-seqblock");
             if (div !== null) {
                 const aRows = div.querySelectorAll(".la-vz-linear-annotation-row").length;
-                setHeight(102 + 16 * aRows);
+                setHeight(107 + 16 * aRows);
+                setWidth(Math.max(22, 10.7 + 10.7 * seqData.seq.length));
+            }
+            const svDiv = document.querySelector(".la-vz-linear-scroller");
+            if (svDiv !== null) {
+                svDiv.style["overflow"] = "";
+                console.log(svDiv)
             }
             setUpdated(false);
         }
-    }, [updated, divId]);
+    }, [updated, divId, seqData.seq]);
 
     return (
         <div style={{ height: "100%", verticalAlign: "top" }} id={divId}>
-            <div style={{ height: `${height}px`, width: "100%", display: "block" }}>
-                {seqData.seq !== "" &&  // Because SeqViz refuses to update when seq is ""
-                <SeqViz
-                    { ...seqData }
-                    viewer="linear"
-                    selection={selection}
-                    annotations={annotations}
-                    translations={translations}
-                    onSelection={selectionHandler}
-                    showIndex={false}
-                />}
+            <div style={{ height: "100%", verticalAlign: "top", overflowX: "scroll" }}>
+                <div style={{ height: `${height}px`, width: `${width}px`, display: "block" }}>
+                    {seqData.seq !== "" &&  // Because SeqViz refuses to update when seq is ""
+                    <SeqViz
+                        { ...seqData }
+                        viewer="linear"
+                        selection={selection}
+                        annotations={annotations}
+                        translations={translations}
+                        onSelection={selectionHandler}
+                        showIndex={false}
+                    />}
+                </div>
             </div>
             {isEditable &&
             <div>
