@@ -307,7 +307,6 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
             const svDiv = document.querySelector(".la-vz-linear-scroller");
             if (svDiv !== null) {
                 svDiv.style["overflow"] = "";
-                console.log(svDiv)
             }
             setUpdated(false);
         }
@@ -315,7 +314,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
 
     return (
         <div style={{ height: "100%", verticalAlign: "top" }} id={divId}>
-            <div style={{ height: "100%", verticalAlign: "top", overflowX: "scroll" }}>
+            <div style={{ overflowX: "scroll" }}>
                 <div style={{ height: `${height}px`, width: `${width}px`, display: "block" }}>
                     {seqData.seq !== "" &&  // Because SeqViz refuses to update when seq is ""
                     <SeqViz
