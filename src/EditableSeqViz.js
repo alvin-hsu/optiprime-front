@@ -304,10 +304,8 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
                 setHeight(107 + 16 * aRows);
                 setWidth(Math.max(22, 10.7 + 10.7 * seqData.seq.length));
             }
-            const svDiv = document.querySelector(".la-vz-linear-scroller");
-            if (svDiv !== null) {
-                svDiv.style["overflow"] = "";
-            }
+            const svDivs = document.querySelectorAll(".la-vz-linear-scroller");
+            svDivs.forEach(svDiv => { svDiv.style["overflow"] = "hidden" })
             setUpdated(false);
         }
     }, [updated, divId, seqData.seq]);

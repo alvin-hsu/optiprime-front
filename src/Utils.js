@@ -1,8 +1,6 @@
 import { Buffer } from "buffer";
 import { KJUR } from "jsrsasign";
 
-import "./Utils.css";
-
 // ****************************** GENOMIC INFO APIs ****************************** 
 /* Scraping various web APIs. Each function returns a Promise for the desired return type. */
 export const rsIDtoHg38Coords = (rsID) => {
