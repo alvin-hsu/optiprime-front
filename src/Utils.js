@@ -50,9 +50,9 @@ export const cvIDtoHg38Coords = (cvID) => {
                }
                const varData = data["result"][cvID]["variation_set"][0];
                const spdi = varData["canonical_spdi"];
-               const [unedited, edited] = spdi.split(":").slice(2);
+               const [start, unedited, edited] = spdi.split(":").slice(1);
                const coord = varData["variation_loc"].filter(x => (x["status"] === "current"))[0];
-               const { chr, start, assembly_name } = coord;
+               const { chr, assembly_name } = coord;
                return { coords: { assembly: ASM_MAP[assembly_name],
                                   chrom: "chr" + chr,
                                   pos: start },
