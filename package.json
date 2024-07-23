@@ -8,6 +8,7 @@
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
+    "autocomplete-lhc": "^19.2.4",
     "aws-amplify": "^6.0.12",
     "buffer": "^6.0.3",
     "js-cookie": "^3.0.5",

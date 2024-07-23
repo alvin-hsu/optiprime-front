@@ -29,6 +29,39 @@ export const rsIDtoHg38Coords = (rsID) => {
            });
 };
 
+export const cvIDtoHg38Coords = (cvID) => {
+    const ASM_MAP = { "NCBI36": "hg18",
+                      "GRCh37": "hg19",
+                      "GRCh38": "hg38",
+                      "T2T-CHM13v2.0": "hs1" }
+    return fetch("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?" +
+                 new URLSearchParams({ db: "clinvar",
+                                       id: cvID,
+                                       retmode: "json" }).toString())
+           .then(resp => {
+               if (!resp.ok) {
+                   throw new Error("Failed to query ClinVar");
+               }
+               return resp.json();
+           })
+           .then(data => {
+               if (!("result" in data) || !(cvID in data["result"])) {
+                   throw new Error("Missing result in ClinVar response:" + JSON.stringify(data));
+               }
+               const varData = data["result"][cvID]["variation_set"][0];
+               const spdi = varData["canonical_spdi"];
+               const [unedited, edited] = spdi.split(":").slice(2);
+               const coord = varData["variation_loc"].filter(x => (x["status"] === "current"))[0];
+               const { chr, start, assembly_name } = coord;
+               return { coords: { assembly: ASM_MAP[assembly_name],
+                                  chrom: "chr" + chr,
+                                  pos: start },
+                        alleles: { eName: varData["variation_name"],
+                                   minU: unedited,
+                                   minE: edited } };
+           });
+};
+
 export const fetchUCSCGenomes = () => {
     return fetch("https://api.genome.ucsc.edu/list/ucscGenomes")
            .then(resp => {
@@ -100,9 +133,7 @@ export const fetchSequenceFromCoords = (coords, contextLen) => {
                }
                return resp.json();
            })
-           .then(data => {
-               return data["dna"];
-           });
+           .then(data =>  data["dna"]);
 };
 
 // ****************************** COMPUTATION ******************************
