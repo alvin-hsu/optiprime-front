@@ -30,7 +30,7 @@ const Home = () => {
         return <Login />;
     }
     const idJwt = decodeToken(idToken);
-    const username = idJwt["cognito:username"];
+    const username = idJwt["sub"];
     const tos = (typeof Cookies.get("tos") !== "undefined")
                 ? Cookies.get("tos")
                 : idJwt["tos"];
