@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import Cookies from "js-cookie";
 
+import { fetchAuth } from "./Utils";
+
 const TOS = () => {
     const [isChecked, setIsChecked] = useState(false);
 
@@ -9,16 +11,11 @@ const TOS = () => {
     };
 
     const acceptTOS = (_) => {
-        const token = Cookies.get("access_token");
-        const url = "https://api.optipri.me/accept_tos";
-       (fetch(url, { headers: { "Authorization": token },
-                     method: "POST" })
+        (fetchAuth("ac_token", "https://api.optipri.me/accept_tos", { method: "POST" })
         .then(resp => {
-            console.log(resp);
             return resp.text();
         })
         .then(tos => {
-            console.log(tos);
             Cookies.set('tos', tos, { secure: true, sameSite: 'Strict' });
             window.location.reload();
         }));

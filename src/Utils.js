@@ -1,5 +1,6 @@
 import { Buffer } from "buffer";
 import { KJUR } from "jsrsasign";
+import Cookies from "js-cookie";
 
 // ****************************** GENOMIC INFO APIs ****************************** 
 /* Scraping various web APIs. Each function returns a Promise for the desired return type. */
@@ -325,4 +326,43 @@ export const verifyRSASignature = (publicKey, b64Sig, msgStr) => {
     sigObj.init(publicKey);
     sigObj.updateString(msgStr);
     return sigObj.verify(hexSig);
-}
+};
+
+export const fetchAuth = (tokenName, resource, init) => {
+    const token = Cookies.get(tokenName);
+    let newInit;
+    if (typeof init === "undefined") {
+        newInit = { headers: { "Authorization": token } };
+    } else if (!("headers" in init)) {
+        newInit = { headers: { "Authorization": token }, ...init };
+    } else {
+        newInit = { headers: { "Authorization": token, ...init.headers }, ...init };
+    }
+    return fetch(resource, newInit);
+};
+
+export const suspensePromiseWrapper = (promise) => {
+    let status = "pending";
+    let result;
+    let suspender = promise.then(
+        r => {
+            status = "success";
+            result = r;
+        },
+        e => {
+            status = "error";
+            result = e;
+        }
+    );
+    return {
+        read: () => {
+            if (status === "pending") {
+                throw suspender;
+            } else if (status === "error") {
+                throw result;
+            } else {
+                return result;
+            }
+        }
+    };
+};
