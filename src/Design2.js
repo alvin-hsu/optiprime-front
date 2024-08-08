@@ -157,6 +157,7 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
                                              cdsList: uCdsList },
                              editedData: { ...s.editedData,
                                            cdsList: eCdsList } }));
+            console.log(x);
         });
     };
 
@@ -247,6 +248,31 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
                                            cdsList: eCdsList } }));
         });
     };
+    const submitCoords = (_) => {
+        const [chrom, pos] = chrCoords.split(":");
+        const coords = { assembly, chrom, pos };
+        pushInfo("organism", "Fetching reference sequence...");
+        fetchSequenceFromCoords(coords, _CONTEXT_LEN)
+        .then(seq => {
+            setState(prevState => ({ ...prevState,
+                                     uneditedData: { ...prevState.uneditedData,
+                                                     name: `Ref (${assembly})`, seq } }));
+        })
+        .catch(error => {
+            pushError("organism", error.toString());
+        })
+        .finally(() => {
+           popInfo("organism");
+        });
+        coordsToRefSeq(coords)
+        .then(refSeq => {
+            const cdsList = getContextExonTranslations(refSeq, coords.pos, _CONTEXT_LEN);
+            setState(prevState => ({ ...prevState,
+                                     uneditedData: { ...prevState.uneditedData, cdsList }}));
+        });
+    };
+
+
     return (
         <Card column="2">
             <Heading children="Search ClinVar for gene variants:" />
@@ -284,8 +310,7 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
                            onChange={e => setChrCoords("chr" + e.target.value.toUpperCase().replace(/[^0-9XY:]/g, ""))}
                            labelHidden={true}
                            width="300px" />
-                <Button children="Get sequence"
-                        disabled={!validChrCoords} />
+                <Button children="Get sequence" disabled={!validChrCoords} onClick={submitCoords} />
             </Flex>
             <Divider label="or" margin="10px" />
             <ToggleButton margin="10px"
@@ -348,7 +373,30 @@ const Organism = ({ state, setState, pushInfo, popInfo, pushError, popError }) =
         setValidChrCoords(/chr[\d\w]+:\d+/.test(chrCoords));
     }, [chrCoords]);
 
-    // TODO: useEffect() for valid chrCoords
+    const submitCoords = (_) => {
+        const [chrom, pos] = chrCoords.split(":");
+        const coords = { assembly, chrom, pos };
+        pushInfo("organism", "Fetching reference sequence...");
+        fetchSequenceFromCoords(coords, _CONTEXT_LEN)
+        .then(seq => {
+            setState(prevState => ({ ...prevState,
+                                     uneditedData: { ...prevState.uneditedData,
+                                                     name: `Ref (${assembly})`, seq } }));
+        })
+        .catch(error => {
+            pushError("organism", error.toString());
+        })
+        .finally(() => {
+           popInfo("organism");
+        });
+        coordsToRefSeq(coords)
+        .then(refSeq => {
+            const cdsList = getContextExonTranslations(refSeq, coords.pos, _CONTEXT_LEN);
+            setState(prevState => ({ ...prevState,
+                                     uneditedData: { ...prevState.uneditedData, cdsList }}));
+        });
+    };
+
     return (
         <Card column="2">
             {ucscFetched && <>
@@ -371,7 +419,7 @@ const Organism = ({ state, setState, pushInfo, popInfo, pushError, popError }) =
                            onChange={e => setChrCoords("chr" + e.target.value.toUpperCase().replace(/[^0-9XY:]/g, ""))}
                            labelHidden={true}
                            width="300px" />
-                <Button children="Get sequence" disabled={!validChrCoords} />
+                <Button children="Get sequence" disabled={!validChrCoords} onClick={submitCoords} />
             </Flex>
             </>}
             </>}
@@ -450,6 +498,7 @@ const Design = () => {
     };
     const [state, setState] = useState(initialValues);
     // Messages to display
+    const [tempText, setTempText] = useState("");
     const [infoMsgs, setInfoMsgs] = useState({});
     const [errorMsgs, setErrorMsgs] = useState({});
     const _pushObject = (setFunction, key, value) => {
@@ -471,6 +520,16 @@ const Design = () => {
     // Props to pass to child components
     const props = { state, setState, pushInfo, pushError, popInfo, popError };
 
+    // FOR DEBUGGING
+    useEffect(() => {
+        let upperState = state
+        upperState.uneditedData.seq = state.uneditedData.seq.toUpperCase();
+        upperState.editedData.seq = state.editedData.seq.toUpperCase();
+        window.printState = () => {
+            console.log(JSON.stringify(JSON.stringify(upperState)));
+        }
+    }, [state]);
+
     // HIGHLIGHT EDIT
     useEffect(() => {
         if (state.uneditedData.seq === "" || state.editedData.seq === "") { return; }
@@ -491,9 +550,16 @@ const Design = () => {
         setState(s => ({ ...s, editedData: { ...s.editedData, highlights: eHighlights } }));
     }, [state.uneditedData.seq, state.editedData.seq]);  // eslint-disable-line
 
+    const handleSubmit = (_) => {
+        setTempText(JSON.stringify(JSON.stringify(state)));
+        // fetchAuth("ac_token", "https://api.optipri.me/projects", {
+        //     method: "PUT",
+        //     body: JSON.stringify(state)
+        // })
+    };
+
     return (
         <Grid
-            as="form"
             rowGap="15px"
             columnGap={tokens.space.medium.value}
             padding="20px"
@@ -534,6 +600,7 @@ const Design = () => {
                 </Alert>
             ))}
             {(state.uneditedData.seq !== "" && state.editedData.seq !== "") && <>
+            <p>{tempText}</p>
             <Divider columnStart="1" columnEnd="-1" orientation="horizontal" />
             <Flex justifyContent="space-between">
                 <Flex gap={tokens.space.medium.value}>
@@ -542,6 +609,7 @@ const Design = () => {
                         type="submit"
                         variation="primary"
                         isDisabled={Object.keys(errorMsgs).length !== 0}
+                        onClick={handleSubmit}
                     ></Button>
                 </Flex>
             </Flex>
