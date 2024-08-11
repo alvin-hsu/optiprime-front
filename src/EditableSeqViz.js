@@ -197,20 +197,6 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
         }
     };
 
-    // TOGGLE EDITING
-    const toggleEditing = () => {
-        setEditEnabled(oldState => {
-            if (!oldState) {
-                setSelection(seqData.seq === ""
-                             ? { clockwise: true, start: 0, end: 0 }
-                             : { clockwise: true, start: NaN, end: NaN });
-            } else {
-                setSelection({ clockwise: true, start: NaN, end: NaN });
-            }
-            return isEditable && !oldState
-        });
-    };
-
     // MANAGE CDS'S
     useEffect(() => {
         // Check if selection is a range
