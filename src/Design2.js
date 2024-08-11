@@ -22,18 +22,29 @@ import {
     minEdit,
     rsIDtoHg38Coords,
     updateCDS,
-    cvIDtoHg38Coords
+    cvIDtoHg38Coords,
+    fetchAuth
 } from "./Utils";
 import ClinvarAutocomplete from "./ClinvarAutocomplete";
 import EditableSeqViz from "./EditableSeqViz";
 
 const _CONTEXT_LEN = 75;
 
-const Name = ({ state, setState }) => {
+const Name = ({ state, setState, pushError, popError }) => {
     // Local state
     const [projName, setProjName] = useState(state.projName);
     // Update global state
     const updateGlobal = () => {
+        if (projName.length >= 40) {
+            pushError("name", "Name must be under 40 characters long.");
+            return;
+        }
+        if (!/^[a-zA-Z0-9\-_]+$/.test(projName)) {
+            setState(s => ({ ...s, projName: "" }));
+            pushError("name", "Name can only contain alphanumeric characters, hyphens, and underscores.");
+            return;
+        }
+        popError("name");
         setState(s => ({ ...s, projName }));
     };
     return (
@@ -44,31 +55,30 @@ const Name = ({ state, setState }) => {
                            value={projName}
                            onChange={e => setProjName(e.target.value)}
                            width="80%"/>
-                <Button children="Submit" onClick={updateGlobal} />
+                <Button children="Submit"
+                        onClick={updateGlobal}
+                        disabled={(projName.length === 0) || (projName === state.projName)} />
             </Flex>
         </Card>
     );
 };
 
 const IsHuman = ({ state, setState }) => {
-    // Local state
-    const [organism, setOrganism] = useState(state.organism);
-    // Update global state
-    useEffect(() => {
-        setState(s => ({ ...s, organism }));
-    }, [organism]);  // eslint-disable-line
+    const setOrganism = (organism) => {
+        setState(s => ({ ...s, organism, manual: false }))
+    }
     return (
         <Card column="2" height="114px">
             <Heading children="Is the genotype you want to edit from a human?" />
             <Grid templateColumns="100px 100px" gap="1rem" padding="10px">
                 <ToggleButton children="Human"
                               onClick={() => setOrganism("human")}
-                              isPressed={organism === "human"}
+                              isPressed={state.organism === "human"}
                               display="flex"
                               column="1" />
                 <ToggleButton children="Other"
                               onClick={() => setOrganism("other")}
-                              isPressed={organism === "other"}
+                              isPressed={state.organism === "other"}
                               display="flex"
                               column="2" />
             </Grid>
@@ -80,15 +90,12 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
     // Clinvar
     const [cvData, setCvData] = useState({});
     const [cvID, setCvID] = useState(state.cvID);
-    const [gene, setGene] = useState(state.gene);
     // rsID entry
     const [rsID, setRsID] = useState(state.rsID);
     // Genomic coordinates
     const [assembly, setAssembly] = useState(state.assembly);
     const [chrCoords, setChrCoords] = useState(state.chrCoords);
     const [validChrCoords, setValidChrCoords] = useState(false);
-    // Manual entry
-    const [manual, setManual] = useState(state.manual);
     // Constants
     const ASSEMBLIES = [{ value: "hg18", label: "hg18 (NCBI36)" },
                         { value: "hg19", label: "hg19 (GRCh37)" },
@@ -96,8 +103,8 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
                         { value: "hs1",  label: "hs1 (T2T-CHM13v2.0)" }];
     // Set global state
     useEffect(() => {
-        setState(s => ({ ...s, gene, cvID, rsID, assembly, chrCoords, manual }));
-    }, [gene, cvID, rsID, assembly, chrCoords, manual]);  // eslint-disable-line
+        setState(s => ({ ...s, cvID, rsID, assembly, chrCoords }));
+    }, [cvID, rsID, assembly, chrCoords]);  // eslint-disable-line
     // Check if chrCoords format is valid
     useEffect(() => {
         setValidChrCoords(/chr(?:\d|1\d|2[0-2]|[XY]):\d+/.test(chrCoords));
@@ -119,7 +126,7 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
             const eSeq = seq.substring(0, _CONTEXT_LEN) + minE + seq.substring(_CONTEXT_LEN + uLen);
             setState(s => ({ ...s,
                              uneditedData: { ...s.uneditedData,
-                                             name: `${gene} (ref)`,
+                                             name: `${x.gene} (ref)`,
                                              seq: seq },
                              editedData: { ...s.editedData,
                                            name: eName,
@@ -167,7 +174,6 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
         const result = cvData.list.filter(x => x[0] === cvData.final_val)[0];
         setAssembly("hg19");
         setCvID(result[0]);
-        setGene(result[1]);
         const [start, end] = result[3].split("^").map(x => parseInt(x));
         const pos = Math.floor((start + end) / 2);
         setChrCoords(`chr${result[2]}:${pos}`);
@@ -183,7 +189,6 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
             popInfo("human");
             setAssembly("hg38");
             setChrCoords(`chr${entry[1]}:${entry[2]}`);
-            setGene(entry[3]);
             const coords = { assembly: "hg38",
                              chrom: "chr" + entry[1],
                              pos: entry[2] };
@@ -251,7 +256,7 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
     const submitCoords = (_) => {
         const [chrom, pos] = chrCoords.split(":");
         const coords = { assembly, chrom, pos };
-        pushInfo("organism", "Fetching reference sequence...");
+        pushInfo("human", "Fetching reference sequence...");
         fetchSequenceFromCoords(coords, _CONTEXT_LEN)
         .then(seq => {
             setState(prevState => ({ ...prevState,
@@ -271,7 +276,10 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
                                      uneditedData: { ...prevState.uneditedData, cdsList }}));
         });
     };
-
+    const useManual = (_) => {
+        popError("human");
+        setState(s => ({ ...s, organism: "", manual: true }));
+    };
 
     return (
         <Card column="2">
@@ -280,12 +288,12 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
             <Divider label="or" margin="10px" />
             <Heading children="Search dbSNP by rsID:" />
             <Flex justifyContent="flex-start" alignItems="baseline" padding="5px">
-                <TextField placeholder="rsID (e.g., rs113993960)"
+                <TextField label="rsID" labelHidden={true}
+                           placeholder="rsID (e.g., rs113993960)"
                            value={rsID}
                            onChange={e => setRsID("rs" + e.target.value.replace(/\D/g, ""))}
                            onKeyDown={e => {if (e.key === "Enter") {submitRsID();}}}
-                           height="100%"
-                           labelHidden={true} />
+                           height="100%" />
                 <Button children="rsID search"
                         onClick={_ => {submitRsID();}}
                         disabled={!/rs\d+/.test(rsID)}
@@ -294,10 +302,10 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
             <Divider label="or" margin="10px" />
             <Heading children="Enter genomic coordinates:" />
             <Flex justifyContent="flex-start" alignItems="baseline" padding="5px">
-                <SelectField value={assembly}
+                <SelectField label="assembly" labelHidden={true}
+                             value={assembly}
                              onChange={e => setAssembly(e.target.value)}
                              placeholder="Genome assembly"
-                             labelHidden={true}
                              width="250px">
                     {ASSEMBLIES.map(option => (
                     <option key={option.value} value={option.value}>
@@ -305,18 +313,17 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
                     </option>
                     ))}
                 </SelectField>
-                <TextField placeholder="Coordinates (e.g., chr7:117559592)"
+                <TextField label="chrcoords" labelHidden={true}
+                           placeholder="Coordinates (e.g., chr7:117559592)"
                            value={chrCoords}
                            onChange={e => setChrCoords("chr" + e.target.value.toUpperCase().replace(/[^0-9XY:]/g, ""))}
-                           labelHidden={true}
                            width="300px" />
                 <Button children="Get sequence" disabled={!validChrCoords} onClick={submitCoords} />
             </Flex>
             <Divider label="or" margin="10px" />
-            <ToggleButton margin="10px"
-                          isPressed={manual}
-                          onClick={() => setManual(true)}
-                          children="Enter sequences manually" />
+            <Button margin="10px"
+                    onClick={useManual}
+                    children="Enter sequences manually" />
         </Card>
     );
 };
@@ -330,11 +337,10 @@ const Organism = ({ state, setState, pushInfo, popInfo, pushError, popError }) =
     const [assembly, setAssembly] = useState(state.assembly);
     const [chrCoords, setChrCoords] = useState(state.chrCoords);
     const [validChrCoords, setValidChrCoords] = useState(false);
-    const [manual, setManual] = useState(state.manual);
     // Set global state
     useEffect(() => {
-        setState(s => ({ ...s, taxId, assembly, chrCoords, manual }));
-    }, [taxId, assembly, chrCoords, manual]);  // eslint-disable-line
+        setState(s => ({ ...s, taxId, assembly, chrCoords }));
+    }, [taxId, assembly, chrCoords]);  // eslint-disable-line
     // On load, check if UCSC genomes are downloaded and if not, fetch them
     useEffect(() => {
         // Check localStorage
@@ -370,7 +376,7 @@ const Organism = ({ state, setState, pushInfo, popInfo, pushError, popError }) =
     }, []);  // eslint-disable-line
     // Check if chrCoords format is valid
     useEffect(() => {
-        setValidChrCoords(/chr[\d\w]+:\d+/.test(chrCoords));
+        setValidChrCoords(/chr\w+:\d+/.test(chrCoords));
     }, [chrCoords]);
 
     const submitCoords = (_) => {
@@ -397,6 +403,11 @@ const Organism = ({ state, setState, pushInfo, popInfo, pushError, popError }) =
         });
     };
 
+    const useManual = (_) => {
+        popError("human");
+        setState(s => ({ ...s, organism: "", manual: true }));
+    };
+
     return (
         <Card column="2">
             {ucscFetched && <>
@@ -414,25 +425,32 @@ const Organism = ({ state, setState, pushInfo, popInfo, pushError, popError }) =
                           options={byTaxId[taxId].genomes.map(x => ({id: x, label: x}))}
                           onSelect={option => setAssembly(option.id)}
                           width="250px" />
-                <TextField placeholder="Coordinates (e.g., chr7:117559592)"
+                <TextField label="chrcoords" labelHidden={true}
+                           placeholder="Coordinates (e.g., chr7:117559592)"
                            value={chrCoords}
                            onChange={e => setChrCoords("chr" + e.target.value.toUpperCase().replace(/[^0-9XY:]/g, ""))}
-                           labelHidden={true}
                            width="300px" />
                 <Button children="Get sequence" disabled={!validChrCoords} onClick={submitCoords} />
             </Flex>
             </>}
             </>}
             <Divider label="or" margin="10px" />
-            <ToggleButton margin="10px"
-                          isPressed={manual}
-                          onClick={() => setManual(true)}
-                          children="Enter sequences manually" />
+            <Button margin="10px"
+                    onClick={useManual}
+                    children="Enter sequences manually" />
         </Card>
     );
 };
 
-const Unedited = ({ state, setState }) => {
+const Unedited = ({ state, setState, pushError, popError }) => {
+    const setLabel = (label) => {
+        if (label.length > 200) {
+            pushError("unedited", "Name cannot exceed 200 characters.");
+            return;
+        }
+        popError("unedited");
+        setState(s => ({ ...s, uneditedData: { ...s.uneditedData, name: label } }));
+    };
     const setUneditedData = (update) => {
         if (typeof update === "function") {
             setState(s => ({ ...s, uneditedData: update(s.uneditedData) }));
@@ -440,10 +458,14 @@ const Unedited = ({ state, setState }) => {
             setState(s => ({ ...s, uneditedData: update }));
         }
     };
-    const label = state.uneditedData.name !== "" ? state.uneditedData.name : "";
     return (
         <Card columnStart="1" columnEnd="-1">
-            <Heading children={`Unedited sequence: ${label}`} />
+            <Heading children={"Unedited sequence:"} />
+            <TextField label={"name"} labelHidden={true}
+                       placeholder={"Sequence name (optional)"}
+                       value={state.uneditedData.name}
+                       onChange={e => setLabel(e.target.value)}
+                       width="80%"/>
             <EditableSeqViz isEditable={true}
                             seqData={state.uneditedData}
                             setSeqData={setUneditedData} />
@@ -451,7 +473,15 @@ const Unedited = ({ state, setState }) => {
     );
 };
 
-const Edited = ({ state, setState }) => {
+const Edited = ({ state, setState, pushError, popError }) => {
+    const setLabel = (label) => {
+        if (label.length > 200) {
+            pushError("unedited", "Name cannot exceed 200 characters.");
+            return;
+        }
+        popError("unedited");
+        setState(s => ({ ...s, editedData: { ...s.editedData, name: label } }));
+    };
     const setEditedData = (update) => {
         if (typeof update === "function") {
             setState(s => ({ ...s, editedData: update(s.editedData) }));
@@ -466,10 +496,14 @@ const Edited = ({ state, setState }) => {
     const switchSeqs = () => {
         setState(s => ({ ...s, uneditedData: s.editedData, editedData: s.uneditedData }));
     };
-    const label = state.editedData.name !== "" ? state.editedData.name : "";
     return (
         <Card columnStart="1" columnEnd="-1">
-            <Heading children={`Edited sequence: ${label}`} />
+            <Heading children={"Edited sequence:"} />
+            <TextField label={"name"} labelHidden={true}
+                       placeholder={"Sequence name (optional)"}
+                       value={state.editedData.name}
+                       onChange={e => setLabel(e.target.value)}
+                       width="80%"/>
             <Button onClick={copyUnedited}>Copy from unedited sequence</Button>
             <Button onClick={switchSeqs}>{'\u21d5'}</Button>
             <EditableSeqViz isEditable={true}
@@ -484,7 +518,6 @@ const Design = () => {
     const initialValues = {
         projName: "",
         organism: "",
-        gene: "",
         cvID: "",
         rsID: "",
         assembly: "",
@@ -551,11 +584,36 @@ const Design = () => {
     }, [state.uneditedData.seq, state.editedData.seq]);  // eslint-disable-line
 
     const handleSubmit = (_) => {
-        setTempText(JSON.stringify(JSON.stringify(state)));
-        // fetchAuth("ac_token", "https://api.optipri.me/projects", {
-        //     method: "PUT",
-        //     body: JSON.stringify(state)
-        // })
+        const minState = {
+            projName: state.projName,
+            uneditedData: {
+                name: state.uneditedData.name,
+                seq: state.uneditedData.seq,
+                cdsList: state.uneditedData.cdsList
+            },
+            editedData: {
+                name: state.editedData.name,
+                seq: state.editedData.seq,
+                cdsList: state.editedData.cdsList
+            }
+        };
+        setTempText(JSON.stringify(JSON.stringify(minState)));
+        fetchAuth("ac_token", "https://api.optipri.me/projects", {
+            method: "PUT",
+            body: JSON.stringify(state)
+        })
+        .then(resp => {
+            if (!resp.ok) {
+                throw new Error(`Bad response: ${resp.text()}`)
+            }
+            return resp.json();
+        })
+        .catch(e => {
+            console.log(e);
+        })
+        .finally(_ => {
+            setTempText("");
+        });
     };
 
     return (
@@ -567,10 +625,9 @@ const Design = () => {
             templateColumns="1fr 800px 1fr"
         >
             <Name {...props} />
-            {state.projName && <>
+            {state.projName && !("name" in errorMsgs) && <>
             <Divider columnStart="1" columnEnd="-1" orientation="horizontal" />
             <IsHuman {...props} />
-            </>}
             {state.organism === "human" && <>
             <Divider columnStart="1" columnEnd="-1" orientation="horizontal" />
             <Human {...props} />
@@ -587,9 +644,10 @@ const Design = () => {
             <Divider columnStart="1" columnEnd="-1" orientation="horizontal" />
             <Edited {...props} />
             </>}
-            <Card columnStart="1" columnEnd="-1" height="1fr" />
             <Divider columnStart="1" columnEnd="-1" orientation="horizontal" />
-            {Object.entries(infoMsgs).map(([key, msg]) => (
+            </>}
+            <Card columnStart="1" columnEnd="-1">
+             {Object.entries(infoMsgs).map(([key, msg]) => (
                 <Alert key={key} isDismissible={false} hasIcon={true} variation="info">
                     {msg}
                 </Alert>
@@ -599,6 +657,7 @@ const Design = () => {
                     {msg}
                 </Alert>
             ))}
+            </Card>
             {(state.uneditedData.seq !== "" && state.editedData.seq !== "") && <>
             <p>{tempText}</p>
             <Divider columnStart="1" columnEnd="-1" orientation="horizontal" />

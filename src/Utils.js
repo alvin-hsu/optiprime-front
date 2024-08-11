@@ -59,7 +59,8 @@ export const cvIDtoHg38Coords = (cvID) => {
                                   pos: start },
                         alleles: { eName: varData["variation_name"],
                                    minU: unedited,
-                                   minE: edited } };
+                                   minE: edited },
+                        gene: data["result"][cvID]["gene_sort"] };
            });
 };
 
