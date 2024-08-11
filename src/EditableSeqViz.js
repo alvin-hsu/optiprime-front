@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { SeqViz } from "seqviz";
 import { Button, SwitchField, Text } from "@aws-amplify/ui-react";
 
@@ -8,7 +8,7 @@ import { makeCDSAandTs, updateCDS, randomId } from "./Utils";
 const MAX_UNDO_STACK = 64;
 
 export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHandler }) {
-    const [editEnabled, setEditEnabled] = useState(seqData.seq === "");
+    const [editEnabled, setEditEnabled] = useState(false);
     const [selection, setSelection] = useState(seqData.seq === ""
                                                ? {clockwise: true, start: 0, end: 0}
                                                : {clockwise: true, start: NaN, end: NaN});
@@ -32,8 +32,18 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
     const [updated, setUpdated] = useState(false);
     const [height, setHeight] = useState(102);
     const [width, setWidth] = useState(10);
+    // Ref for handling clicks
+    const ref = useRef(null);
 
     // MANAGE SEQUENCE EDITING FUNCTIONALITY
+    const clickIn = () => {
+        setEditEnabled(true);
+    };
+    const clickOut = (e) => {
+        if (ref.current && !ref.current.contains(e.target)) {
+            setEditEnabled(false);
+        }
+    };
     useEffect(() => {
         if (!editEnabled) { return; }
         const sequence = seqData.seq;
@@ -170,20 +180,18 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
         window.addEventListener("keypress", keypressHandler);
         window.addEventListener("keydown", keydownHandler);
         window.addEventListener("paste", pasteHandler);
+        window.addEventListener("mousedown", clickOut);
         return () => {
             window.removeEventListener("keypress", keypressHandler);
             window.removeEventListener("keydown", keydownHandler);
             window.removeEventListener("paste", pasteHandler);
+            window.removeEventListener("mousedown", clickOut);
         };
     }, [editEnabled, seqData.seq, seqData.cdsList, selection, isIns, isDel, undoStack]);  // eslint-disable-line
 
     // IF NOT EDITABLE, DISABLE SELECTION
     const selectionHandler = (userSelection) => {
-        if (!editEnabled) {
-            setSelection({ clockwise: true, start: NaN, end: NaN });
-        } else {
-            setSelection(userSelection);
-        }
+        setSelection(userSelection);
         if (typeof selHandler !== 'undefined') {
             selHandler(userSelection);
         }
@@ -206,7 +214,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
     // MANAGE CDS'S
     useEffect(() => {
         // Check if selection is a range
-        if (!editEnabled || !selection.start || selection.start === selection.end) {
+        if (!editEnabled || isNaN(selection.start) || selection.start === selection.end) {
             setShowAddCDS(false);
             setShowCDSCtrls(false);
             return;
@@ -311,7 +319,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
     }, [updated, divId, seqData.seq]);
 
     return (
-        <div style={{ height: "100%", verticalAlign: "top" }} id={divId}>
+        <div ref={ref} onClick={clickIn} style={{ height: "100%", verticalAlign: "top" }} id={divId}>
             <div style={{ overflowX: "scroll" }}>
                 <div style={{ height: `${height}px`, width: `${width}px`, display: "block" }}>
                     {seqData.seq !== "" &&  // Because SeqViz refuses to update when seq is ""
@@ -326,14 +334,6 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
                     />}
                 </div>
             </div>
-            {isEditable &&
-            <div>
-                <SwitchField
-                    label="Allow editing"
-                    isChecked={editEnabled}
-                    onChange={toggleEditing}
-                />
-            </div>}
             { showWarn &&
             <div className="warn-paste" style={{ width: "100%", display: "block" }}>
                 <Text>Paste data contained non-ACGT characters! Please check: {pasteData}</Text>
