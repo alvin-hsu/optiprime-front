@@ -11,7 +11,7 @@ const TOS = () => {
     };
 
     const acceptTOS = (_) => {
-        (fetchAuth("ac_token", "https://api.optipri.me/accept_tos", { method: "POST" })
+        (fetchAuth("id_token", "https://api.optipri.me/accept_tos", { method: "POST" })
         .then(resp => {
             return resp.text();
         })
