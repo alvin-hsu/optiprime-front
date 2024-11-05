@@ -1,13 +1,13 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useLayoutEffect, useState, useRef } from "react";
 import { SeqViz } from "seqviz";
-import { Button, SwitchField, Text } from "@aws-amplify/ui-react";
+import { Button, Text } from "@aws-amplify/ui-react";
 
-import { makeCDSAandTs, updateCDS, randomId } from "./Utils";
+import { makeCDSAandTs, updateCDS } from "./Utils";
 
 
 const MAX_UNDO_STACK = 64;
 
-export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHandler }) {
+export default function EditableSeqViz({ seqData, setSeqData, selHandler }) {
     const [editEnabled, setEditEnabled] = useState(false);
     const [selection, setSelection] = useState(seqData.seq === ""
                                                ? {clockwise: true, start: 0, end: 0}
@@ -26,14 +26,15 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
     // CDS => ANNOTATIONS/TRANSLATIONS
     const [annotations, setAnnotations] = useState(seqData.annotations);
     const [translations, setTranslations] = useState(seqData.translations);
-    // Div ID for finding in the DOM
-    const divId = `sv${randomId(10)}`;
     // Height of inner div containing seqviz component
-    const [updated, setUpdated] = useState(false);
     const [height, setHeight] = useState(102);
     const [width, setWidth] = useState(10);
-    // Ref for handling clicks
+    // Only scroll when mouse is over div
+    const [scrollEnabled, setScrollEnabled] = useState(false);
+    // Ref for handling clicks and div height
     const ref = useRef(null);
+    // Ref for setting scroll bar position
+    const scrollRef = useRef(null);
 
     // MANAGE SEQUENCE EDITING FUNCTIONALITY
     const clickIn = () => {
@@ -42,6 +43,7 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
     const clickOut = (e) => {
         if (ref.current && !ref.current.contains(e.target)) {
             setEditEnabled(false);
+            setSelection({clockwise: true, start: 0, end: 0});
         }
     };
     useEffect(() => {
@@ -285,28 +287,41 @@ export default function EditableSeqViz({ isEditable, seqData, setSeqData, selHan
         setTranslations([...seqData.translations, ...cdsTranslations]);
     }, [seqData]);
 
-    // Set height/width based on # of annotation rows
+    // Set width and scroll position based on sequence length
     useEffect(() => {
-        const timer = setTimeout(() => { setUpdated(true); }, 1);
-        return () => clearTimeout(timer);
-    }, [annotations]);
-    useEffect(() => {
-        if (updated) {
-            const div = document.querySelector(`#${divId}`).querySelector(".la-vz-seqblock");
-            if (div !== null) {
-                const aRows = div.querySelectorAll(".la-vz-linear-annotation-row").length;
-                setHeight(107 + 16 * aRows);
-                setWidth(Math.max(22, 10.7 + 10.7 * seqData.seq.length));
-            }
-            const svDivs = document.querySelectorAll(".la-vz-linear-scroller");
-            svDivs.forEach(svDiv => { svDiv.style["overflow"] = "hidden" })
-            setUpdated(false);
+        setWidth(Math.max(22, 10.7 + 10.7 * seqData.seq.length));
+        if (scrollRef.current) {
+            scrollRef.current.scrollLeft = scrollRef.current.scrollLeftMax / 2;
         }
-    }, [updated, divId, seqData.seq]);
+    }, [seqData.seq]);
+    // Set height based on # of annotation rows
+    useEffect(() => {
+        if (ref.current) {
+            const observer = new MutationObserver((_, observer) => {
+                const seqblocks = ref.current.getElementsByClassName("la-vz-seqblock");
+                if (seqblocks.length > 0) {
+                    const div = seqblocks[0];
+                    const aRows = div.getElementsByClassName("la-vz-linear-annotation-row").length;
+                    setHeight(80 + 18 * aRows);
+                }
+                const scrollers = ref.current.getElementsByClassName("la-vz-linear-scroller");
+                if (scrollers.length > 0) {
+                    const div = scrollers[0];
+                    div.style["overflow"] = "hidden";
+                    div.style["position"] = "absolute";
+                    div.scrollTop = 0;
+                }
+                observer.disconnect();
+            });
+            observer.observe(ref.current, {CharacterData: false, childList: true, subtree: true, attributes: false})
+        }
+    }, [seqData]);
+
+    useEffect(() => {console.log(scrollEnabled)}, [scrollEnabled])
 
     return (
-        <div ref={ref} onClick={clickIn} style={{ height: "100%", verticalAlign: "top" }} id={divId}>
-            <div style={{ overflowX: "scroll" }}>
+        <div ref={ref} onClick={clickIn} style={{ height: "100%", verticalAlign: "top" }}>
+            <div ref={scrollRef} style={{ overflowX: "scroll" }}>
                 <div style={{ height: `${height}px`, width: `${width}px`, display: "block" }}>
                     {seqData.seq !== "" &&  // Because SeqViz refuses to update when seq is ""
                     <SeqViz
