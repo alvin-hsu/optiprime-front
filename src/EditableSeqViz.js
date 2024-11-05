@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { SeqViz } from "seqviz";
 import { Button, Text } from "@aws-amplify/ui-react";
 
@@ -29,8 +29,6 @@ export default function EditableSeqViz({ seqData, setSeqData, selHandler }) {
     // Height of inner div containing seqviz component
     const [height, setHeight] = useState(102);
     const [width, setWidth] = useState(10);
-    // Only scroll when mouse is over div
-    const [scrollEnabled, setScrollEnabled] = useState(false);
     // Ref for handling clicks and div height
     const ref = useRef(null);
     // Ref for setting scroll bar position
@@ -291,6 +289,7 @@ export default function EditableSeqViz({ seqData, setSeqData, selHandler }) {
     useEffect(() => {
         setWidth(Math.max(22, 10.7 + 10.7 * seqData.seq.length));
         if (scrollRef.current) {
+            // noinspection JSUnresolvedReference
             scrollRef.current.scrollLeft = scrollRef.current.scrollLeftMax / 2;
         }
     }, [seqData.seq]);
@@ -316,8 +315,6 @@ export default function EditableSeqViz({ seqData, setSeqData, selHandler }) {
             observer.observe(ref.current, {CharacterData: false, childList: true, subtree: true, attributes: false})
         }
     }, [seqData]);
-
-    useEffect(() => {console.log(scrollEnabled)}, [scrollEnabled])
 
     return (
         <div ref={ref} onClick={clickIn} style={{ height: "100%", verticalAlign: "top" }}>
