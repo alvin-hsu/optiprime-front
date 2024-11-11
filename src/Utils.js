@@ -47,7 +47,7 @@ export const cvIDtoHg38Coords = (cvID) => {
            })
            .then(data => {
                if (!("result" in data) || !(cvID in data["result"])) {
-                   throw new Error("Missing result in ClinVar response:" + JSON.stringify(data));
+                   throw new Error(`Invalid Clinvar ID: ${cvID}`);
                }
                const varData = data["result"][cvID]["variation_set"][0];
                const spdi = varData["canonical_spdi"];

@@ -10,8 +10,8 @@ import Jobs from "./Jobs";
 import About from "./About";
 import Header from "./Header";
 import Design from "./Design";
-import Design2 from "./Design2";
 import OtherLinks from "./Other";
+import Project from "./Project";
 import SeqVizTest from "./SeqVizTest";
 import IDPResponse from "./IDPResponse";
 
@@ -29,11 +29,11 @@ const App = () => {
                     <Route path="/about" element={<About />} />
                     <Route path="/other" element={<OtherLinks />}/>
                     <Route path="/design" element={<Design />} />
-                    <Route path="/design2" element={<Design2 />} />
                     <Route path="/jobs" element={<Jobs />} />
                     <Route path="/seqviz" element={<SeqVizTest />} />
                     <Route path="/idpresponse" element={<IDPResponse />} />
                     <Route path="/terms-of-service" element={<TOS />} />
+                    <Route path="/project" element={<Project />}></Route>
                 </Routes>
             </View>
         </div>

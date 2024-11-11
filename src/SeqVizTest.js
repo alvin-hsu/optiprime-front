@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import EditableSeqViz from "./EditableSeqViz";
+import { EditableSeqViz } from "./ModdedSeqViz";
 
 export default function SeqVizTest() {
     const [ seqData, setSeqData ] = useState({ seq: "",
