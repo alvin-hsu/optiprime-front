@@ -200,6 +200,11 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
             });
         }
     }
+    // NCBI output is different from what is intuitive to work with >.>
+    contextExons = contextExons.map(cds => ({ ...cds,
+                                              start: cds.direction === "+" ? cds.start : cds.end,
+                                              end: cds.direction === "+" ? cds.end : cds.start,
+                                              frame: (3 - cds.frame) % 3 }));
     // console.log("Context Exons:", contextExons);
     return contextExons;
 };
@@ -209,25 +214,21 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
  * getContextExonTranslations. Notably, start, end, and frame are taken directly from the output.
  */
 export const makeCDSAandTs = ({ name, start, end, direction, frame }) => {
+    const atStart = Math.min(start, end);
+    const atEnd = Math.max(start, end);
+    const length = atEnd - atStart;
+    const tDelta = direction === "+" ? frame : (length - frame) % 3;
     // The annotation itself is easy
     const annotation = {
         name: name,
-        start: start,
-        end: end,
+        start: atStart,
+        end: atEnd,
         direction: direction === "+" ? 1 : -1,
         color: "orange"
     };
-    // SeqViz makes the translation part annoying though, since it doesn't let you specify frame
-    frame = ((frame % 3) + 3) % 3;  // Ensure frame is positive
-    if (direction === "+") {
-        frame = (3 - frame) % 3;  // Thanks, NCBI, for making this weird...
-    } else {
-        const cdsLen = end - start;
-        frame = (cdsLen + frame) % 3;  // ...not to mention inconsistent.
-    }
     const translation = {
-        start: start + frame,
-        end: end,
+        start: atStart + tDelta,
+        end: atEnd,
         direction: direction === "+" ? 1 : -1
     };
     return {

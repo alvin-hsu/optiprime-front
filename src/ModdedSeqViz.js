@@ -322,7 +322,7 @@ const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
         if (currCDS === undefined || seqData.cdsList[currCDS] === undefined) { return; }
         const cdsList = seqData.cdsList;
         const cdsData = cdsList[currCDS];
-        const offset = cdsData.direction === "+" ? 1 : 2;
+        const offset = cdsData.direction === "+" ? 2 : 1;
         cdsList[currCDS] = { ...cdsData, frame: (cdsData.frame + offset) % 3 };
         setCdsList(cdsList);
     };
@@ -337,7 +337,7 @@ const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
         if (currCDS === undefined || seqData.cdsList[currCDS] === undefined) { return; }
         const cdsList = seqData.cdsList;
         const cdsData = cdsList[currCDS];
-        const offset = cdsData.direction === "+" ? 2 : 1;
+        const offset = cdsData.direction === "+" ? 1 : 2;
         cdsList[currCDS] = { ...cdsData, frame: (cdsData.frame + offset) % 3 };
         setCdsList(cdsList);
     };
