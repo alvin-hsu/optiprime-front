@@ -8,7 +8,7 @@ import {
     Flex,
     Grid,
     Heading,
-    SelectField, SliderField, SwitchField,
+    SelectField,
     TextField,
     ToggleButton,
     useTheme,
@@ -22,14 +22,13 @@ import {
     minEdit,
     rsIDtoHg38Coords,
     updateCDS,
-    revcomp,
     cvIDtoHg38Coords,
     fetchAuth
 } from "./Utils";
 import ClinvarAutocomplete from "./ClinvarAutocomplete";
 import { EditableSeqViz } from "./ModdedSeqViz";
 
-const _CONTEXT_LEN = 100;
+const _CONTEXT_LEN = 110;
 
 const Name = ({ state, setState, pushError, popError }) => {
     // Local state
@@ -518,12 +517,12 @@ const Design = () => {
         chrCoords: "",
         taxId: "",
         uneditedData: {
-            name: "", seq: "", cdsList: [],
-            annotations: [], translations: [], highlights: []
+            name: "", seq: "", selection: {clockwise: true, start: 0, end: 0},
+            cdsList: [], annotations: [], translations: [], highlights: []
         },
         editedData: {
-            name: "", seq: "", cdsList: [],
-            annotations: [], translations: [], highlights: []
+            name: "", seq: "", selection: {clockwise: true, start: 0, end: 0},
+            cdsList: [], annotations: [], translations: [], highlights: []
         },
         manual: false
     };
@@ -563,9 +562,24 @@ const Design = () => {
         let upperState = state
         upperState.uneditedData.seq = state.uneditedData.seq.toUpperCase();
         upperState.editedData.seq = state.editedData.seq.toUpperCase();
+        const {minU, minE, preLen} = minEdit(upperState.uneditedData.seq, upperState.editedData.seq);
         window.printState = () => {
             console.log(JSON.stringify(JSON.stringify(upperState)));
-        }
+        };
+        window.printPridict = () => {
+            const uSeq = upperState.uneditedData.seq;
+            const preSeq = uSeq.slice(preLen - 100, preLen);
+            const postSeq = uSeq.slice(preLen + minU.length, preLen + minU.length + 100);
+            const u = minU.length === 0 ? "+" : minU;
+            const e = minE.length === 0 ? "-" : minE;
+            console.log(`${preSeq}(${u}/${e})${postSeq}`);
+        };
+        window.printDeepPrime = () => {
+            const uSeq = upperState.uneditedData.seq;
+            const eSeq = upperState.editedData.seq;
+            console.log(uSeq.slice(preLen - 100, preLen + 21));
+            console.log(eSeq.slice(preLen - 100, preLen + 21));
+        };
     }, [state]);
 
     // HIGHLIGHT EDIT

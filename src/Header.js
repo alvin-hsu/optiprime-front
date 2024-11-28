@@ -7,7 +7,7 @@ const NavBar = () => {
     const [isNavVisible, setIsNavVisible] = useState(false);
     const navigate = useNavigate();
     const BUTTONS = [{ link: "/", text: "home" },
-                     { link: "/rest", text: "REST API" },
+                     { link: "/rest", text: "projects" },
                      { link: "/about", text: "about" },
                      { link: "/other", text: "other links" }];
     return (
