@@ -14,7 +14,9 @@ const SeqVizWithCDS = ({ seqData, selHandler }) => {
     const [annotations, setAnnotations] = useState(origAnnotations);
     const origTranslations = seqData.translations;
     const [translations, setTranslations] = useState(origTranslations);
-    const [selection, setSelection] = useState({clockwise: true, start: NaN, end: NaN});
+    const [selection, setSelection] = useState("selection" in seqData
+                                               ? seqData.selection
+                                               : {clockwise: true, start: NaN, end: NaN});
     // Reference
     const ref = useRef(null);
     // SELECTION HANDLER
@@ -23,7 +25,7 @@ const SeqVizWithCDS = ({ seqData, selHandler }) => {
         if (typeof selHandler !== 'undefined') {
             selHandler(userSelection);
         }
-    }
+    };
     // TURN CDS => ANNOTATIONS/TRANSLATIONS
     useEffect(() => {
         const cdsAandTs = seqData.cdsList.map(cds => makeCDSAandTs(cds));
@@ -88,9 +90,6 @@ const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
     const MAX_UNDO_STACK = 64;
     // State
     const [editEnabled, setEditEnabled] = useState(false);
-    const [selection, setSelection] = useState(seqData.seq === ""
-                                               ? {clockwise: true, start: 0, end: 0}
-                                               : {clockwise: true, start: NaN, end: NaN});
     // PASTE FUNCTIONALITY
     const [pasteData, setPasteData] = useState("");
     const [showWarn, setShowWarn] = useState(false);
@@ -105,6 +104,24 @@ const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
     // Ref for handling clicks and div height
     const ref = useRef(null);
 
+    // WRAPPERS FOR setSeqData
+    const setSequence = (newSeq) => {
+        setSeqData(prevSeqData => ({ ...prevSeqData, seq: newSeq }));
+    };
+    const setSelection = (newSelection) => {
+        setSeqData(prevSeqData => ({ ...prevSeqData, selection: newSelection }));
+    };
+    const setCdsList = (newCdsList) => {
+        setSeqData(prevSeqData => ({ ...prevSeqData, cdsList: [ ...newCdsList ] }));
+    };
+    // SELECTION HANDLER
+    const selectionHandler = (userSelection) => {
+        setSelection(userSelection);
+        if (typeof selHandler !== 'undefined') {
+            selHandler(userSelection);
+        }
+    }
+
     // MANAGE SEQUENCE EDITING FUNCTIONALITY
     const clickIn = () => {
         setEditEnabled(true);
@@ -112,22 +129,16 @@ const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
     const clickOut = (e) => {
         if (ref.current && !ref.current.contains(e.target)) {
             setEditEnabled(false);
-            setSelection({clockwise: true, start: 0, end: 0});
+            setSelection({ clockwise: true, start: 0, end: 0 });
         }
     };
     useEffect(() => {
         if (!editEnabled) { return; }
         const sequence = seqData.seq;
-        const setSequence = (newSeq) => {
-            setSeqData(prevSeqData => ({ ...prevSeqData, seq: newSeq }));
-        };
+        const selection = seqData.selection;
         const updateCDSList = (selection, delta) => {
-            setSeqData(prevSeqData => ({
-                ...prevSeqData,
-                cdsList: prevSeqData.cdsList
-                                     .map(cds => updateCDS(cds, selection, delta))
-                                     .filter(cds => !!cds)
-            }));
+            setCdsList(seqData.cdsList.map(cds => updateCDS(cds, selection, delta))
+                                      .filter(cds => !!cds));
         };
         // Managing the undoStack
         const pushUndoStack = () => {
@@ -146,7 +157,7 @@ const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
                 setUndoStack(prevUndoStack => prevUndoStack.slice(0, undoStack.length - 1));
                 setSequence(item.oldSequence);
                 setSelection(item.oldSelection);
-                setSeqData(prevSeqData => ({ ...prevSeqData, cdsList: item.oldCDSList }));
+                setCdsList(item.oldCDSList)
             }
             setIsIns(false);
             setIsDel(false);
@@ -220,7 +231,7 @@ const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
             }
         };
         const pasteHandler = (event) => {
-            let hasSelection = selection.start !== null;
+            const selection = seqData.selection;
             let clipboardText = event.clipboardData.getData('Text');
             clipboardText = clipboardText.replace(/\s+/g, "")
             let processedText = clipboardText.toUpperCase().replace(/[^ACGT]+/g, "")
@@ -231,7 +242,7 @@ const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
                 setShowWarn(false);
                 setPasteData("");
             }
-            if (hasSelection) {
+            if (selection.start !== null) {
                 setIsIns(false);
                 setIsDel(false);
                 pushUndoStack();
@@ -258,10 +269,11 @@ const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
             window.removeEventListener("paste", pasteHandler);
             window.removeEventListener("mousedown", clickOut);
         };
-    }, [editEnabled, seqData.seq, seqData.cdsList, selection, isIns, isDel, undoStack]);  // eslint-disable-line
+    }, [editEnabled, seqData.seq, seqData.cdsList, seqData.selection, isIns, isDel, undoStack]);  // eslint-disable-line
 
     // MANAGE CDS'S
     useEffect(() => {
+        const selection = seqData.selection;
         // Check if selection is a range
         if (!editEnabled || isNaN(selection.start) || selection.start === selection.end) {
             setShowAddCDS(false);
@@ -288,8 +300,9 @@ const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
             setShowCDSCtrls(false);
             setCurrCDS(null);
         }
-    }, [editEnabled, seqData.cdsList, selection]);
+    }, [editEnabled, seqData.cdsList, seqData.selection]);
     const handleAddCDS = () => {
+        const selection = seqData.selection;
         const selStart = Math.min(selection.start, selection.end);
         const selEnd = Math.max(selection.start, selection.end);
         const newCDS = { name: "CDS",
@@ -297,53 +310,43 @@ const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
                          end: selEnd,
                          direction: (selection.clockwise ? "+" : "-"),
                          frame: 0 };
-        setSeqData((prevSeqData) => ({ ...prevSeqData,
-                                       cdsList: [...prevSeqData.cdsList, newCDS]}));
+        setCdsList([...seqData.cdsList, newCDS]);
     };
     const handleDelCDS = () => {
         if (currCDS === undefined) { return; }
-        setSeqData((prevSeqData) => {
-            let cdsList = prevSeqData.cdsList;
-            cdsList.splice(currCDS, 1);
-            return { ...prevSeqData,
-                     cdsList: cdsList };
-        });
+        let cdsList = seqData.cdsList;
+        cdsList.splice(currCDS, 1);
+        setCdsList(cdsList);
     };
     const handleShiftLeft = () => {
         if (currCDS === undefined || seqData.cdsList[currCDS] === undefined) { return; }
-        const offset = seqData.cdsList[currCDS].direction === "+" ? 1 : 2
-        setSeqData((prevSeqData) => {
-            let cdsList = prevSeqData.cdsList;
-            cdsList[currCDS].frame = (cdsList[currCDS].frame + offset) % 3;
-            return { ...prevSeqData,
-                     cdsList: cdsList }
-        });
+        const cdsList = seqData.cdsList;
+        const cdsData = cdsList[currCDS];
+        const offset = cdsData.direction === "+" ? 1 : 2;
+        cdsList[currCDS] = { ...cdsData, frame: (cdsData.frame + offset) % 3 };
+        setCdsList(cdsList);
     };
     const handleFlip = () => {
         if (currCDS === undefined || seqData.cdsList[currCDS] === undefined) { return; }
-        setSeqData((prevSeqData) => {
-            let cdsList = prevSeqData.cdsList;
-            cdsList[currCDS].direction = cdsList[currCDS].direction === "+" ? "-" : "+";
-            return { ...prevSeqData,
-                     cdsList: cdsList }
-        });
+        const cdsList = seqData.cdsList;
+        const cdsData = cdsList[currCDS];
+        cdsList[currCDS] = { ...cdsData, direction: cdsData.direction === "+" ? "-" : "+" };
+        setCdsList(cdsList);
     };
     const handleShiftRight = () => {
         if (currCDS === undefined || seqData.cdsList[currCDS] === undefined) { return; }
-        const offset = seqData.cdsList[currCDS].direction === "+" ? 2 : 1
-        setSeqData((prevSeqData) => {
-                    let cdsList = prevSeqData.cdsList;
-                    cdsList[currCDS].frame = (cdsList[currCDS].frame + offset) % 3;
-                    return { ...prevSeqData,
-                             cdsList: cdsList }
-        });
+        const cdsList = seqData.cdsList;
+        const cdsData = cdsList[currCDS];
+        const offset = cdsData.direction === "+" ? 2 : 1;
+        cdsList[currCDS] = { ...cdsData, frame: (cdsData.frame + offset) % 3 };
+        setCdsList(cdsList);
     };
 
     return (
         <div ref={ref} onClick={clickIn} style={{ height: "100%", verticalAlign: "top" }}>
             <SeqVizWithCDS
                 seqData={seqData}
-                selHandler={selHandler}
+                selHandler={selectionHandler}
             />
             { showWarn &&
             <div className="warn-paste" style={{ width: "100%", display: "block" }}>
@@ -436,7 +439,7 @@ const UneditedSeqViz = ({ seqData, name, pamVar, highlights }) => {
     }, [pamVar]);
 
     return (
-        <div ref={ref} style={{ height: "112px", width: "100%", display: "block", overflowY: "hidden" }}>
+        <div ref={ref} style={{ height: "113px", width: "100%", display: "block", overflowY: "hidden" }}>
             <SeqViz
                 { ...seqData }
                 viewer="linear"
@@ -656,7 +659,7 @@ const EditedSeqViz = ({ seqData, highlights }) => {
 
     return (
         <div ref={ref} style={{ height: "100%", verticalAlign: "top" }}>
-            <div style={{ height: "195px", width: "100%", display: "block" }}>
+            <div style={{ height: "208px", width: "100%", display: "block" }}>
                 <SeqViz
                     { ...seqData }
                     annotations={currAnns}
