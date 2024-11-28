@@ -580,6 +580,7 @@ const Design = () => {
             console.log(uSeq.slice(preLen - 100, preLen + 21));
             console.log(eSeq.slice(preLen - 100, preLen + 21));
         };
+        window.getStateObject = () => upperState;
     }, [state]);
 
     // HIGHLIGHT EDIT
