@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import Plot from "react-plotly.js";
 import {
-    Card, Heading, Grid, useTheme, Divider, Alert
+    Card, Heading, Grid, useTheme, Divider, Alert, SwitchField
 } from "@aws-amplify/ui-react";
 
 import { fetchAuth, minEdit, revcomp } from "./Utils";
@@ -16,6 +17,112 @@ const fetchProjectData = async (projectID) => {
     return fetchAuth("id_token", url);
 };
 
+const PAMSlider = ({ cutoff, setCutoff }) => {
+    const WIDTH = 500;
+    const HEIGHT = 200;
+    const [data, setData] = useState({});
+    const [mouseShape, setMouseShape] = useState({});
+    const [cutoffShape, setCutoffShape] = useState({ type: "line", x0: 0, x1: 0,
+                                                     y0: 0, y1: 1, yref: "paper",
+                                                     line: { color: "red", width: 2 } });
+    const ref = useRef(null);
+    // Load HT-PAMDA data on first load in background
+    useEffect(() => {
+        const DATA_URL = "/PAM-scores.json";
+        fetch(DATA_URL)
+        .then(r => r.json())
+        .then(data => {setData(data);});
+    }, []);
+    // Add a line where the mouse is
+    const handleMouseMove = (event) => {
+        const plot = ref.current && ref.current.querySelector(".js-plotly-plot");
+        if (plot) {
+            const { left } = event.target.getBoundingClientRect();
+            const xRel = event.clientX - left;
+            const dataX = plot._fullLayout.xaxis.p2d(xRel);
+            const shape = {
+                type: "line",
+                x0: dataX, x1: dataX,
+                y0: 0, y1: 1, yref: "paper",  // Paper coords => full height
+                line: {
+                    color: "gray",
+                    width: 1
+                }
+            };
+            setMouseShape(shape);
+        }
+    };
+    const handleMouseLeave = () => {
+        setMouseShape({});
+    };
+    // Add a line where the PAM cutoff is
+    useEffect(() => {
+        const plot = ref.current && ref.current.querySelector(".js-plotly-plot");
+        if (plot && "PAMDA_scale" in data && "PAMDA_bias" in data) {
+            const dataX = data["PAMDA_scale"] * (cutoff + data["PAMDA_bias"]);
+            const shape = {
+                type: "line",
+                x0: dataX, x1: dataX,
+                y0: 0, y1: 1, yref: "paper",  // Paper coords => full height
+                line: {
+                    color: "red",
+                    width: 2
+                }
+            };
+            setCutoffShape(shape);
+        }
+    }, [data, cutoff])
+    const handleMouseDown = (event) => {
+        const plot = ref.current && ref.current.querySelector(".js-plotly-plot");
+        if (plot) {
+            const { left } = event.target.getBoundingClientRect();
+            const xRel = event.clientX - left;
+            const dataX = plot._fullLayout.xaxis.p2d(xRel);
+            setCutoff((dataX / data["PAMDA_scale"]) - data["PAMDA_bias"]);
+        }
+    };
+
+    return (
+        <div style={{ textAlign: "center" }}>
+            <div
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
+                onMouseDown={handleMouseDown}
+                ref={ref}
+                style={{ width: WIDTH, height: HEIGHT, backgroundColor: "red" }}
+            >
+                <Plot
+                    data={[
+                        {
+                            x: data["x"],
+                            y: data["y"],
+                            type: "scatter"
+                        }
+                    ]}
+                    layout={{
+                        width: WIDTH,
+                        height: HEIGHT,
+                        shapes: "type" in mouseShape ? [cutoffShape, mouseShape] : [cutoffShape],
+                        margin: { l: 40, r: 10, b: 35, t: 0, pad: 0 },
+                        xaxis: {
+                            range: [-2, 2], autorange: false, title: "Mininmum PAM score",
+                            zeroline: false
+                        },
+                        yaxis: { range: [0, 65], autorange: false, title: "Number of 4-bp PAMs" },
+                        dragmode: false
+                    }}
+                    config={{
+                        displayModeBar: false,
+                        scrollZoom: false,
+                        doubleClick: false,
+                        displaylogo: false
+                    }}
+                />
+            </div>
+        </div>
+    );
+};
+
 const Project = () => {
     const {tokens} = useTheme();
     const searchParams = useSearchParams()[0];
@@ -26,7 +133,7 @@ const Project = () => {
     const [useVars, setUseVars] = useState(false);  // Using PAM variants?
     const [PAMDA, setPAMDA] = useState({});
     const [pamMap, setPamMap] = useState({});
-    const [pamCutoff, setPamCutoff] = useState(-1.75);
+    const [pamCutoff, setPamCutoff] = useState(-1.67);
     // Manage selected protospacer
     const [selected, setSelected] = useState("");
     const [usvData, setUsvData] = useState({});
@@ -63,19 +170,38 @@ const Project = () => {
             seq: "TGGGGAATTATTTGAGAAAGCAAAACAAAACAATAACAATAGAAAAACTTCTAATGGTGATGACAGCCTCTTCTTCAGTAATTTCTCACTTCTTGGTACTCTGTCCTGAAAGATATTAATTTCAAGATAGAAAGAGGACAGTTGTTGGCGGTTGCTGGATCCACTGGAGCAGGCAAGGTAGTTCTTTTGTTCTTCACTA",
             cdsList: [{"name": "CFTR Exon 10",
                        "start": 0, "end": 177,
-                       "direction": "-", "frame": 2}]
+                       "direction": "-", "frame": 0}]
         },
         editedData: {
             name: "NM_000492.4(CFTR):c.1315C>G (p.Pro439Ala)",
             seq: "TGGGGAATTATTTGAGAAAGCAAAACAAAACAATAACAATAGAAAAACTTCTAATGGTGATGACAGCCTCTTCTTCAGTAATTTCTCACTTCTTGGTACTGCTGTCCTGAAAGATATTAATTTCAAGATAGAAAGAGGACAGTTGTTGGCGGTTGCTGGATCCACTGGAGCAGGCAAGGTAGTTCTTTTGTTCTTCACTA",
             cdsList: [{"name": "CFTR Exon 10",
                        "start": 0, "end": 178,
-                       "direction": "-", "frame": 2}]
-        }
+                       "direction": "-", "frame": 0}]
+        },
+        fwdProtos: [],
+        revProtos: []
     };
 
     const [projectData, setProjectData] = useState(testProjectData);
-
+    // Load HT-PAMDA data on first load in background
+    useEffect(() => {
+        const HT_PAMDA_URL = "/HT-PAMDA.json";
+        fetch(HT_PAMDA_URL).then(r => r.json()).then(data => {
+            setPAMDA(data);
+            let pamMap = {};
+            for (const [pamVar, pamdaMap] of Object.entries(data)) {
+                for (const [pam, pamda] of Object.entries(pamdaMap)) {
+                    if (pam in pamMap) {
+                        pamMap[pam] = (pamMap[pam].pamda > pamda) ? pamMap[pam] : { pamVar, pamda };
+                    } else {
+                        pamMap[pam] = { pamVar, pamda };
+                    }
+                }
+            }
+            setPamMap(pamMap);
+        });
+    }, []);
     // For updating CDS data to entries  FIXME?
     const updateCDS = (cds, ps) => {
         // Protospacer info
@@ -110,24 +236,14 @@ const Project = () => {
                  start, end, frame }
     };
 
-    // Load HT-PAMDA data on first load in background
-    useEffect(() => {
-        const HT_PAMDA_URL = "/HT-PAMDA.json";
-        fetch(HT_PAMDA_URL).then(r => r.json()).then(data => {
-            setPAMDA(data);
-            let pamMap = {};
-            for (const [pamVar, pamdaMap] of Object.entries(data)) {
-                for (const [pam, pamda] of Object.entries(pamdaMap)) {
-                    if (pam in pamMap) {
-                        pamMap[pam] = (pamMap[pam].pamda > pamda) ? pamMap[pam] : { pamVar, pamda };
-                    } else {
-                        pamMap[pam] = { pamVar, pamda };
-                    }
-                }
-            }
-            setPamMap(pamMap);
-        });
-    }, []);
+
+
+
+
+
+
+
+
     // Highlight edit
     useEffect(() => {
         const {minU, minE, preLen} = minEdit(projectData.uneditedData.seq, projectData.editedData.seq);
@@ -143,7 +259,7 @@ const Project = () => {
         // Set edited highlight
         const eHighlights = minE.length > 0 ? [eHighlight] : [];
         setProjectData(s => ({ ...s, editedData: { ...s.editedData, highlights: eHighlights } }));
-        // Add line where an insertion happens, since it will be hidden later
+        // Add line where an insertion happens
         if (ref.current && minU.length === 0) {
             const observer = new MutationObserver((_, observer) => {
                 const svg = ref.current.getElementsByClassName("la-vz-seqblock")[0];
@@ -352,6 +468,11 @@ const Project = () => {
                 </div>
                 <Heading children={`${projectData.editedData.name}`} />
                 <SeqVizWithCDS seqData={projectData.editedData} />
+                <SwitchField
+                    label="Use PAM variants"
+                    labelPosition="start"
+                    onChange={(e) => { setUseVars(e.target.checked); }}
+                />
             </Card>
             <Card columnStart="1" columnEnd="-1">
             {Object.keys(usvData).length > 0 &&
@@ -361,6 +482,9 @@ const Project = () => {
                 <Heading children={`${usvData.name} (edited)`} />
                 <EditedSeqViz { ...esvData } />
             </>}
+            </Card>
+            <Card columnStart="1" columnEnd="-1" width="100%">
+                <PAMSlider cutoff={pamCutoff} setCutoff={setPamCutoff} />
             </Card>
             <Divider columnStart="1" columnEnd="-1" orientation="horizontal" />
             <Card columnStart="1" columnEnd="-1" height="auto">

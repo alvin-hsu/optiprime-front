@@ -585,8 +585,7 @@ const Design = () => {
 
     // HIGHLIGHT EDIT
     useEffect(() => {
-        if (state.uneditedData.seq === "" || state.editedData.seq === "") {
-            return; }
+        if (state.uneditedData.seq === "" || state.editedData.seq === "") { return; }
         const {minU, minE, preLen} = minEdit(state.uneditedData.seq, state.editedData.seq);
         let color = "black";
         popError("no-edit");

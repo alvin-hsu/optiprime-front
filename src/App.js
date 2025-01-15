@@ -14,6 +14,7 @@ import OtherLinks from "./Other";
 import Project from "./Project";
 import SeqVizTest from "./SeqVizTest";
 import IDPResponse from "./IDPResponse";
+import Scratch from "./Scratch";
 
 const App = () => {
     const location = useLocation();
@@ -33,7 +34,8 @@ const App = () => {
                     <Route path="/seqviz" element={<SeqVizTest />} />
                     <Route path="/idpresponse" element={<IDPResponse />} />
                     <Route path="/terms-of-service" element={<TOS />} />
-                    <Route path="/project" element={<Project />}></Route>
+                    <Route path="/project" element={<Project />} />
+                    <Route path="/scratch" element={<Scratch />} />
                 </Routes>
             </View>
         </div>

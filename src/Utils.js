@@ -189,7 +189,7 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
             }
             if (exonEnds[i] > contextEnd && geneData["strand"] === '-') {
                 const distanceFromContextStart = exonEnds[i] - contextEnd;
-                adjustedFrame = (exonFrames[i] + distanceFromContextStart) % 3;
+                adjustedFrame = (exonFrames[i] - distanceFromContextStart) % 3;
             }
             contextExons.push({
                 name: `${geneData["name2"]} Exon ${exonNumber}`,
@@ -202,8 +202,8 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
     }
     // NCBI output is different from what is intuitive to work with >.>
     contextExons = contextExons.map(cds => ({ ...cds,
-                                              start: cds.direction === "+" ? cds.start : cds.end,
-                                              end: cds.direction === "+" ? cds.end : cds.start,
+                                              start: cds.start,
+                                              end: cds.end,
                                               frame: (3 - cds.frame) % 3 }));
     // console.log("Context Exons:", contextExons);
     return contextExons;
