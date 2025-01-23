@@ -153,20 +153,24 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
     const contextStart = Number(target) - Number(contextLen);
     const contextEnd = Number(target) + Number(contextLen);
 
-    const exonStarts = geneData["exonStarts"].split(',').map(Number).filter(n => !isNaN(n));
-    const exonEnds = geneData["exonEnds"].split(',').map(Number).filter(n => !isNaN(n));
+    const exonStarts = geneData["exonStarts"]
+                       .split(',')
+                       .map(Number)
+                       .filter(n => (!isNaN(n) & (n !== 0)));
+    const exonEnds = geneData["exonEnds"]
+                     .split(',')
+                     .map(Number)
+                     .filter(n => (!isNaN(n) & (n !== 0)));
     const exonFrames = geneData["exonFrames"].split(',').map(Number).filter(n => !isNaN(n));
-    const cdsStart = geneData["cdsStart"] - contextStart;  // relative to display window
-    const cdsEnd = geneData["cdsEnd"] - contextStart;      // relative to display window
 
     // Makes the math way easier down the line
     if (geneData["strand"] === "+") {
-        exonStarts[0] = cdsStart;
-        exonEnds[exonEnds.length - 1] = cdsEnd;
+        exonStarts[0] = geneData["cdsStart"];
+        exonEnds[exonEnds.length - 1] = geneData["cdsEnd"];
         exonFrames[0] = 0;
     } else {
-        exonStarts[0] = cdsEnd;
-        exonEnds[exonEnds.length - 1] = cdsStart;
+        exonStarts[0] = geneData["cdsStart"];
+        exonEnds[exonEnds.length - 1] = geneData["cdsEnd"];
         exonFrames[exonFrames.length - 1] = 0;
     }
     let contextExons = [];
@@ -177,7 +181,7 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
         // - Start within end after
         // - Start within end within
         if (exonStarts[i] <= contextEnd && exonEnds[i] >= contextStart) {
-            const exonNumber = geneData["strand"] === '+' ? i + 1 : exonStarts.length - i - 1;
+            const exonNumber = geneData["strand"] === '+' ? i + 1 : exonStarts.length - i;
             // Clip to start/end in case of partial overlap
             const startOffset = Math.max(0, exonStarts[i] - contextStart);
             const endOffset = Math.min(exonEnds[i], contextEnd) - contextStart;
@@ -187,9 +191,9 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
                 const distanceFromContextStart = contextStart - exonStarts[i];
                 adjustedFrame = (exonFrames[i] + distanceFromContextStart) % 3;
             }
-            if (exonEnds[i] > contextEnd && geneData["strand"] === '-') {
+            if (geneData["strand"] === '-') {
                 const distanceFromContextStart = exonEnds[i] - contextEnd;
-                adjustedFrame = (exonFrames[i] - distanceFromContextStart) % 3;
+                adjustedFrame = (exonFrames[i] + distanceFromContextStart) % 3;
             }
             contextExons.push({
                 name: `${geneData["name2"]} Exon ${exonNumber}`,
