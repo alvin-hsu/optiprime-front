@@ -577,8 +577,8 @@ const Design = () => {
         window.printDeepPrime = () => {
             const uSeq = upperState.uneditedData.seq;
             const eSeq = upperState.editedData.seq;
-            console.log(uSeq.slice(preLen - 100, preLen + 21));
-            console.log(eSeq.slice(preLen - 100, preLen + 21));
+            console.log(uSeq.slice(preLen - 60, preLen + 61));
+            console.log(eSeq.slice(preLen - 60, preLen + 61));
         };
         window.getStateObject = () => upperState;
     }, [state]);
