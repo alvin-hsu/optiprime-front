@@ -2,7 +2,7 @@
   "name": "optiprime-front",
   "version": "0.1.0",
   "private": true,
-  "proxy": "http://127.0.0.1:5000",
+  "proxy": "https://api.optipri.me",
   "dependencies": {
     "@aws-amplify/ui-react": "^6.1.1",
     "@testing-library/jest-dom": "^5.17.0",
@@ -17,6 +17,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-google-button": "^0.8.0",
+    "react-icons": "^5.4.0",
     "react-jwt": "^1.2.1",
     "react-plotly.js": "^2.6.0",
     "react-responsive": "^9.0.2",

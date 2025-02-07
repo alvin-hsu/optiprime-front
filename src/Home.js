@@ -1,45 +1,74 @@
 import React from "react";
-import Cookies from "js-cookie";
-import { decodeToken } from "react-jwt";
-
-import Login from "./Login";
-import Logout from "./Logout";
-import TOS from "./TOS";
-import { verifyRSASignature } from "./Utils";
-
-const publicKey = `
------BEGIN PUBLIC KEY-----
-MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEApGaxPHko6WhQSLl57wgT
-3IhTIjSxkDjPgs0+uGc/XNOJ8kb61HdAObycNn4l1w7oZ23ajhTVqsqoQxofwB8P
-r30IbpDF/24Y7/MWwwGLv3UCOT6WBYZNpSRoYvUwAst4jeI10AtOhf4obzaXTcj1
-/KxH8eIET3dXtY+XOnGehwBh5XPG0Ie8wezVlYwjqhHT0oHCKmnqH2MuQfZW+zEu
-EPeYhDN93hIC2wJ2OfpT82vVvSClpC4BIE0qbn8ZOg7ybvt2h9Vzom7Q1Z1QY3d2
-iiQouHhoLa/Phd1/53fvflcOzA20ZDDn9qJ0hzP416c8hJrXOGc0LiwUXuHkvN+V
-rr4IfuX2QL0+iwkOTOVSwU62QU9HDO+vXUZqA33eJT29FrkmeZx2jmRMuNSfHcFx
-LUmZsVzl16KVF5pcxG2qE21tg/VRB7qgdme3gg8VpXrVbvgRyoaiIOlXw6cl/Nah
-tFuFnCSAsfEV8ShZHy0oz4gc48sNyVpRHzN0ZAhi8bPgPE+L+BqCqc/p624WyBIx
-9AYEUr74AR6fbHfL2O0ESDatTvKI1J4hyBRySYldKDagCM/ejEk0gsdfmFGupKdc
-+8nhkhp3AlMCEMs3CxYUYue31YNbZrCbNwWlgnGk4CnXRJAQzAc6yOlEkCcSOD4/
-UCf362qroaxEgAISzmOuUasCAwEAAQ==
------END PUBLIC KEY-----
-`;
+import { View, Button } from "@aws-amplify/ui-react";
 
 const Home = () => {
-    const idToken = Cookies.get("id_token");
-    if (!idToken) {
-        return <Login />;
-    }
-    const idJwt = decodeToken(idToken);
-    const username = idJwt["sub"];
-    const tos = (typeof Cookies.get("tos") !== "undefined")
-                ? Cookies.get("tos")
-                : idJwt["tos"];
-    if (!( (typeof username !== "undefined") &&
-           (typeof tos !== "undefined") &&
-           verifyRSASignature(publicKey, tos, username) )) {
-        return (<> <TOS /><Logout /> </>);
-    }
-    return (<>Success<Logout /></>);
-}
-
+    return (
+        <View
+            style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gridTemplateRows: "1fr 1fr",
+                height: "100%",
+                width: "100%",
+                boxSizing: "border-box",
+                margin: 0,
+                padding: 0,
+                minHeight: 0
+            }}
+        >
+            <Button
+                style={{
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                }}
+                margin="0"
+                onClick={() => console.log("Quadrant 1 clicked")}
+            >
+                Quadrant 1
+            </Button>
+            <Button
+                style={{
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                }}
+                margin="0"
+                onClick={() => console.log("Quadrant 2 clicked")}
+            >
+                Quadrant 2
+            </Button>
+            <Button
+                style={{
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                }}
+                margin="0"
+                onClick={() => console.log("Quadrant 3 clicked")}
+            >
+                Quadrant 3
+            </Button>
+            <Button
+                style={{
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
+                }}
+                margin="0"
+                onClick={() => console.log("Quadrant 4 clicked")}
+            >
+                Quadrant 4
+            </Button>
+        </View>
+    );
+};
 export default Home;

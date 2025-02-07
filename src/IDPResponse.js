@@ -20,23 +20,25 @@ const IDPResponse = () => {
 
     useEffect(() => {
         const hash = window.location.hash.substring(1);
+        if (!hash) { return; }  // Tokens were already processed
+
         const params = new URLSearchParams(hash);
         const idToken = params.get("id_token");
-        const idJwt = decodeToken(idToken);
         const acToken = params.get("access_token");
-        const redirectUrl = params.get("state");
+        const redirectUrl = params.get("state") || "/";
+
+        // Remove the hash from the URL
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+
         if (!(idToken && acToken)) {
             console.log("id_token or access_token not found in the URL");
-            if (redirectUrl) {
-                navigate(redirectUrl);
-            } else {
-                navigate("/");
-            }
+            navigate(redirectUrl, { replace: true });
             return;
         }
         console.log("Got id_token", idToken);
         console.log("Got access_token", acToken);
         // Parse out useful fields from JWT
+        const idJwt = decodeToken(idToken);
         const expTime = new Date(1000 * idJwt["exp"]);
         const tos = idJwt["tos"];
         Cookies.set("ac_token", acToken, { secure: true,
@@ -50,11 +52,7 @@ const IDPResponse = () => {
                                       sameSite: "Strict",
                                       expires: expTime });
         }
-        if (redirectUrl) {
-            navigate(redirectUrl);
-        } else {
-            navigate("/");
-        }
+        navigate(redirectUrl, { replace: true });
     }, [navigate]);
 
     return <div>Loading...</div>;
