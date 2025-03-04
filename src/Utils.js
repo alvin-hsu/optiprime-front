@@ -191,7 +191,7 @@ export const getContextExonTranslations = (geneData, target, contextLen) => {
                 const distanceFromContextStart = contextStart - exonStarts[i];
                 adjustedFrame = (exonFrames[i] + distanceFromContextStart) % 3;
             }
-            if (geneData["strand"] === '-') {
+            if (exonEnds[i] > contextEnd && geneData["strand"] === '-') {
                 const distanceFromContextStart = exonEnds[i] - contextEnd;
                 adjustedFrame = (exonFrames[i] + distanceFromContextStart) % 3;
             }
