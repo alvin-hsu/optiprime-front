@@ -1,132 +1,55 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import Plot from "react-plotly.js";
 import {
     Card, Heading, Grid, useTheme, Divider, Alert, SwitchField
 } from "@aws-amplify/ui-react";
 
-import { fetchAuth, minEdit, revcomp } from "./Utils";
+import ErrorBoundary from "./Error";
+import { fetchAuth, minEdit, revcomp, suspensePromiseWrapper } from "./Utils";
 import { SeqVizWithCDS, UneditedSeqViz, EditedSeqViz } from "./ModdedSeqViz"
 
 
 const SEARCH_DIST = 18;
+let resource = null;
 
 const fetchProjectData = async (projectID) => {
-    const url = new URL("https://api.optipri.me/projects");
-    url.searchParams = new URLSearchParams({ id: projectID });
-    return fetchAuth("id_token", url);
+    if (!projectID) { throw new Error("Project ID required"); }
+
+    let data;
+    const cachedData = localStorage.getItem(`projectData_${projectID}`);
+    if (cachedData) {
+        data = cachedData;
+    } else {
+        const resp = await fetchAuth("ac_token",
+            `https://api.optipri.me/projects?id=${projectID}`,
+            { method: "GET" });
+        if (!resp.ok) {
+            throw new Error(`[${resp.status}] Could not fetch data for project ID: ${projectID}`);
+        }
+        data = await resp.text();
+        localStorage.setItem(`projectData_${projectID}`, data);
+    }
+    data = JSON.parse(data);
+    data["uneditedData"] = JSON.parse(data["uneditedData"]);
+    data["editedData"] = JSON.parse(data["editedData"]);
+    return data;
 };
 
-const PAMSlider = ({ cutoff, setCutoff }) => {
-    const WIDTH = 500;
-    const HEIGHT = 200;
-    const [data, setData] = useState({});
-    const [mouseShape, setMouseShape] = useState({});
-    const [cutoffShape, setCutoffShape] = useState({ type: "line", x0: 0, x1: 0,
-                                                     y0: 0, y1: 1, yref: "paper",
-                                                     line: { color: "red", width: 2 } });
-    const ref = useRef(null);
-    // Load HT-PAMDA data on first load in background
-    useEffect(() => {
-        const DATA_URL = "/PAM-scores.json";
-        fetch(DATA_URL)
-        .then(r => r.json())
-        .then(data => {setData(data);});
-    }, []);
-    // Add a line where the mouse is
-    const handleMouseMove = (event) => {
-        const plot = ref.current && ref.current.querySelector(".js-plotly-plot");
-        if (plot) {
-            const { left } = event.target.getBoundingClientRect();
-            const xRel = event.clientX - left;
-            const dataX = plot._fullLayout.xaxis.p2d(xRel);
-            const shape = {
-                type: "line",
-                x0: dataX, x1: dataX,
-                y0: 0, y1: 1, yref: "paper",  // Paper coords => full height
-                line: {
-                    color: "gray",
-                    width: 1
-                }
-            };
-            setMouseShape(shape);
-        }
-    };
-    const handleMouseLeave = () => {
-        setMouseShape({});
-    };
-    // Add a line where the PAM cutoff is
-    useEffect(() => {
-        const plot = ref.current && ref.current.querySelector(".js-plotly-plot");
-        if (plot && "PAMDA_scale" in data && "PAMDA_bias" in data) {
-            const dataX = data["PAMDA_scale"] * (cutoff + data["PAMDA_bias"]);
-            const shape = {
-                type: "line",
-                x0: dataX, x1: dataX,
-                y0: 0, y1: 1, yref: "paper",  // Paper coords => full height
-                line: {
-                    color: "red",
-                    width: 2
-                }
-            };
-            setCutoffShape(shape);
-        }
-    }, [data, cutoff])
-    const handleMouseDown = (event) => {
-        const plot = ref.current && ref.current.querySelector(".js-plotly-plot");
-        if (plot) {
-            const { left } = event.target.getBoundingClientRect();
-            const xRel = event.clientX - left;
-            const dataX = plot._fullLayout.xaxis.p2d(xRel);
-            setCutoff((dataX / data["PAMDA_scale"]) - data["PAMDA_bias"]);
-        }
-    };
-
-    return (
-        <div style={{ textAlign: "center" }}>
-            <div
-                onMouseMove={handleMouseMove}
-                onMouseLeave={handleMouseLeave}
-                onMouseDown={handleMouseDown}
-                ref={ref}
-                style={{ width: WIDTH, height: HEIGHT, backgroundColor: "red" }}
-            >
-                <Plot
-                    data={[
-                        {
-                            x: data["x"],
-                            y: data["y"],
-                            type: "scatter"
-                        }
-                    ]}
-                    layout={{
-                        width: WIDTH,
-                        height: HEIGHT,
-                        shapes: "type" in mouseShape ? [cutoffShape, mouseShape] : [cutoffShape],
-                        margin: { l: 40, r: 10, b: 35, t: 0, pad: 0 },
-                        xaxis: {
-                            range: [-2, 2], autorange: false, title: "Mininmum PAM score",
-                            zeroline: false
-                        },
-                        yaxis: { range: [0, 65], autorange: false, title: "Number of 4-bp PAMs" },
-                        dragmode: false
-                    }}
-                    config={{
-                        displayModeBar: false,
-                        scrollZoom: false,
-                        doubleClick: false,
-                        displaylogo: false
-                    }}
-                />
-            </div>
-        </div>
-    );
+const useProjectDataResource = (projectID) => {
+    if (resource ===  null) {
+        resource = suspensePromiseWrapper(fetchProjectData(projectID));
+    }
+    return resource;
 };
 
-const Project = () => {
+const ProjectComponent = () => {
     const {tokens} = useTheme();
-    const searchParams = useSearchParams()[0];
+    const [searchParams] = useSearchParams();
     const projectID = searchParams.get("id");
+    const projectDataResource = useProjectDataResource(projectID);
+
+    const [projectData, setProjectData] = useState(projectDataResource.read());  // Blocks until data is ready
+
     // Protospacer search
     const [protos, setProtos] = useState([]);
     // HT-PAMDA data
@@ -162,28 +85,6 @@ const Project = () => {
         }
     };
 
-    // FIXME: Delete and fetch on load
-    const testProjectData = {
-        projName: "test-project",
-        uneditedData: {
-            name: "CFTR (ref)",
-            seq: "TGGGGAATTATTTGAGAAAGCAAAACAAAACAATAACAATAGAAAAACTTCTAATGGTGATGACAGCCTCTTCTTCAGTAATTTCTCACTTCTTGGTACTCTGTCCTGAAAGATATTAATTTCAAGATAGAAAGAGGACAGTTGTTGGCGGTTGCTGGATCCACTGGAGCAGGCAAGGTAGTTCTTTTGTTCTTCACTA",
-            cdsList: [{"name": "CFTR Exon 10",
-                       "start": 0, "end": 177,
-                       "direction": "-", "frame": 0}]
-        },
-        editedData: {
-            name: "NM_000492.4(CFTR):c.1315C>G (p.Pro439Ala)",
-            seq: "TGGGGAATTATTTGAGAAAGCAAAACAAAACAATAACAATAGAAAAACTTCTAATGGTGATGACAGCCTCTTCTTCAGTAATTTCTCACTTCTTGGTACTGCTGTCCTGAAAGATATTAATTTCAAGATAGAAAGAGGACAGTTGTTGGCGGTTGCTGGATCCACTGGAGCAGGCAAGGTAGTTCTTTTGTTCTTCACTA",
-            cdsList: [{"name": "CFTR Exon 10",
-                       "start": 0, "end": 178,
-                       "direction": "-", "frame": 0}]
-        },
-        fwdProtos: [],
-        revProtos: []
-    };
-
-    const [projectData, setProjectData] = useState(testProjectData);
     // Load HT-PAMDA data on first load in background
     useEffect(() => {
         const HT_PAMDA_URL = "/HT-PAMDA.json";
@@ -235,15 +136,6 @@ const Project = () => {
         return { name: ps.name, direction: newDir,
                  start, end, frame }
     };
-
-
-
-
-
-
-
-
-
     // Highlight edit
     useEffect(() => {
         const {minU, minE, preLen} = minEdit(projectData.uneditedData.seq, projectData.editedData.seq);
@@ -450,8 +342,9 @@ const Project = () => {
             setEsvData(eData);
         }
     }, [protoMap, pamMap, selected, protos, projectData]);
-
-    return (
+    return Object.keys(projectData).length > 0 &&
+           projectData.uneditedData &&
+           projectData.editedData ? (
         <Grid
             rowGap="15px"
             columnGap={tokens.space.medium.value}
@@ -459,6 +352,9 @@ const Project = () => {
             width="95%"
             templateColumns="1fr 800px 1fr"
         >
+            <Card columnStart="1" columnEnd="-1" padding="0px">
+                <Heading level={2} children={projectData.projectName} />
+            </Card>
             <Card columnStart="1" columnEnd="-1">
                 <div ref={ref}>
                     <Heading children={`${projectData.uneditedData.name}`} />
@@ -483,9 +379,6 @@ const Project = () => {
                 <EditedSeqViz { ...esvData } />
             </>}
             </Card>
-            <Card columnStart="1" columnEnd="-1" width="100%">
-                <PAMSlider cutoff={pamCutoff} setCutoff={setPamCutoff} />
-            </Card>
             <Divider columnStart="1" columnEnd="-1" orientation="horizontal" />
             <Card columnStart="1" columnEnd="-1" height="auto">
                 {info &&
@@ -494,6 +387,16 @@ const Project = () => {
                 </Alert>}
             </Card>
         </Grid>
+    ) : null;
+};
+
+const Project = () => {
+    return (
+        <ErrorBoundary>
+            <Suspense fallback={<div>Loading project data...</div>}>
+                <ProjectComponent />
+            </Suspense>
+        </ErrorBoundary>
     );
 };
 

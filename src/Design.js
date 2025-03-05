@@ -27,6 +27,7 @@ import {
 } from "./Utils";
 import ClinvarAutocomplete from "./ClinvarAutocomplete";
 import { EditableSeqViz } from "./ModdedSeqViz";
+import {useNavigate} from "react-router-dom";
 
 const _CONTEXT_LEN = 110;
 
@@ -223,9 +224,6 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
             const refSeq = await coordsToRefSeq(coords);
             return { ...x, refSeq };
         })
-        .catch(error => {
-            pushInfo("human", "Error fetching RefSeq data: " + error.toString());
-        })
         .then(x => {
             popInfo("human");
             const { alleles, coords, refSeq } = x;
@@ -244,6 +242,9 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
                                              cdsList: uCdsList },
                              editedData: { ...s.editedData,
                                            cdsList: eCdsList } }));
+        })
+        .catch(error => {
+            pushInfo("human", "Error fetching RefSeq data: " + error.toString());
         });
     };
     const submitCoords = (_) => {
@@ -254,19 +255,22 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
         .then(seq => {
             setState(prevState => ({ ...prevState,
                                      uneditedData: { ...prevState.uneditedData,
-                                                     name: `Ref (${assembly})`, seq } }));
+                                                     name: `Ref (${assembly})`, seq },
+                                     editedData: { ...prevState.editedData,
+                                                   name: `Ref (${assembly})`, seq } }));
         })
         .catch(error => {
-            pushError("organism", error.toString());
+            pushError("human", error.toString());
         })
         .finally(() => {
-           popInfo("organism");
+           popInfo("human");
         });
         coordsToRefSeq(coords)
         .then(refSeq => {
             const cdsList = getContextExonTranslations(refSeq, coords.pos, _CONTEXT_LEN);
             setState(prevState => ({ ...prevState,
-                                     uneditedData: { ...prevState.uneditedData, cdsList }}));
+                                     uneditedData: { ...prevState.uneditedData, cdsList },
+                                     editedData: { ...prevState.editedData, cdsList } }));
         });
     };
     const useManual = (_) => {
@@ -556,6 +560,8 @@ const Design = () => {
     };
     // Props to pass to child components
     const props = {state, setState, pushInfo, pushError, popInfo, popError};
+    // Navigate
+    const navigate = useNavigate();
 
     // FOR DEBUGGING
     useEffect(() => {
@@ -617,19 +623,22 @@ const Design = () => {
                 cdsList: state.editedData.cdsList
             }
         };
-        pushInfo("state", JSON.stringify(minState));
         fetchAuth("ac_token", "https://api.optipri.me/projects", {
             method: "PUT",
             body: JSON.stringify(minState)
         })
         .then(resp => {
-            if (!resp.ok) {
+            if (resp.ok || resp.status === 304) {
+                return resp.json();
+            } else {
                 throw new Error(`Bad response: ${resp.text()}`)
             }
-            return resp.json();
-            // TODO: navigate to project page
+        })
+        .then(data => {
+            navigate(`/project?id=${data["projectID"]}`);
         })
         .catch(e => {
+            pushError("resp", e.toString());
             console.log(e);
         });
     };

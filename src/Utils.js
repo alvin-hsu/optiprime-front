@@ -350,16 +350,15 @@ export const fetchAuth = (tokenName, resource, init) => {
 export const suspensePromiseWrapper = (promise) => {
     let status = "pending";
     let result;
-    let suspender = promise.then(
-        r => {
-            status = "success";
-            result = r;
-        },
-        e => {
-            status = "error";
-            result = e;
-        }
-    );
+    let suspender = promise
+    .then(r => {
+        status = "success";
+        result = r;
+    })
+    .catch(e => {
+        status = "error";
+        result = e;
+    });
     return {
         read: () => {
             if (status === "pending") {
