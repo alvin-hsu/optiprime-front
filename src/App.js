@@ -9,7 +9,7 @@ import { decodeToken } from "react-jwt";
 import GoogleButton from "react-google-button";
 import MediaQuery from "react-responsive";
 import { IoLogOutOutline } from "react-icons/io5";
-import {Button, Image, View, Text} from "@aws-amplify/ui-react"
+import { Button, Image, View, Text } from "@aws-amplify/ui-react"
 import "@aws-amplify/ui-react/styles.css";
 
 import REST from "./REST";
