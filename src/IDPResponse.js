@@ -41,7 +41,6 @@ const IDPResponse = () => {
         const idJwt = decodeToken(idToken);
         const expTime = new Date(1000 * idJwt["exp"]);
         const tos = idJwt["tos"];
-        const idpID = idJwt["idpID"]
         Cookies.set("ac_token", acToken, { secure: true,
                                            sameSite: "Strict",
                                            expires: expTime });
@@ -52,11 +51,6 @@ const IDPResponse = () => {
             Cookies.set("tos", tos, { secure: true,
                                       sameSite: "Strict",
                                       expires: expTime });
-        }
-        if (typeof idpID !== "undefined") {
-            Cookies.set("idpID", idpID, { secure: true,
-                                          sameSite: "Strict",
-                                          expires: expTime });
         }
         navigate(redirectUrl, { replace: true });
     }, [navigate]);
