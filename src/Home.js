@@ -1,6 +1,8 @@
 import React from "react";
 import { View, Button } from "@aws-amplify/ui-react";
 
+import { fetchAuth } from "./Utils";
+
 const Home = () => {
     return (
         <View
@@ -25,7 +27,11 @@ const Home = () => {
                     justifyContent: "center"
                 }}
                 margin="0"
-                onClick={() => console.log("Quadrant 1 clicked")}
+                onClick={() => {
+                    fetchAuth("ac_token", "https://api.optipri.me/jobs/6acb1e3f30")
+                    .then(resp => resp.text())
+                    .then(text => console.log(text));
+                }}
             >
                 Quadrant 1
             </Button>
@@ -38,7 +44,7 @@ const Home = () => {
                     justifyContent: "center"
                 }}
                 margin="0"
-                onClick={() => console.log("Quadrant 2 clicked")}
+                onClick={() => fetchAuth("id_token", "https://storage.optipri.me?jid=SERPINA1")}
             >
                 Quadrant 2
             </Button>

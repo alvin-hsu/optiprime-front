@@ -18,7 +18,6 @@ import Jobs from "./Jobs";
 import About from "./About";
 import Design from "./Design";
 import OtherLinks from "./Other";
-import Project from "./Project";
 import SeqVizTest from "./SeqVizTest";
 import IDPResponse from "./IDPResponse";
 import Scratch from "./Scratch";
@@ -99,8 +98,8 @@ const Header = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const BUTTONS = [{ link: "/", text: "home" },
-                     { link: "/rest", text: "projects" },
+    const BUTTONS = [{ link: "/design", text: "design" },
+                     { link: "/jobs", text: "my jobs" },
                      { link: "/about", text: "about" },
                      { link: "/other", text: "other links" }];
     const idToken = Cookies.get("id_token");
@@ -158,7 +157,9 @@ const Header = () => {
               backgroundColor="white" padding="0"
               style={{ borderBottom: "1px solid gray", zIndex: 100 }}>
             <Image alt="OptiPrime" src="/op-logo-300ppi.png" objectFit="initial"
-                   objectPosition="50% 50%" height="50%" maxHeight="100px" margin="0 0 10px 0" />
+                   objectPosition="50% 50%" height="50%" maxHeight="100px" margin="0 0 10px 0"
+                   onClick={() => navigate("/")}
+            />
             <MediaQuery minWidth={1000}>
                 <View position="absolute" top="10px" right="10px">
                     <LogInOutButton />
@@ -228,13 +229,12 @@ const App = () => {
                     <Route path="/rest" element={<REST />} />
                     <Route path="/about" element={<About />} />
                     <Route path="/other" element={<OtherLinks />}/>
+                    <Route path="/idpresponse" element={<IDPResponse />} />
                     {/* Protected routes */}
                     <Route path="/design" element={<ProtectedRoute><Design /></ProtectedRoute>} />
                     <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
-                    <Route path="/project" element={<ProtectedRoute><Project /></ProtectedRoute>} />
                     {/* Debugging/scratch pages */}
                     <Route path="/seqviz" element={<SeqVizTest />} />
-                    <Route path="/idpresponse" element={<IDPResponse />} />
                     <Route path="/scratch" element={<Scratch />} />
                 </Routes>
             </View>

@@ -342,7 +342,7 @@ export const fetchAuth = (tokenName, resource, init) => {
     } else if (!("headers" in init)) {
         newInit = { headers: { "Authorization": token }, ...init };
     } else {
-        newInit = { headers: { "Authorization": token, ...init.headers }, ...init };
+        newInit = { ...init, headers: { ...init.headers, Authorization: token } };
     }
     return fetch(resource, newInit);
 };

@@ -41,7 +41,7 @@ const SeqVizWithCDS = ({ seqData, selHandler }) => {
     // Set width/height
     useEffect(() => {
         setWidth(Math.max(22, 10.7 + 10.7 * seqData.seq.length));
-        if (ref.current) {
+        if (ref.current !== null) {
             const observer = new MutationObserver((_, observer) => {
                 const seqblocks = ref.current.getElementsByClassName("la-vz-seqblock");
                 if (seqblocks.length > 0) {
