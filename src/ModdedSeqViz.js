@@ -2,8 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { SeqViz } from "seqviz";
 import { Button, Text } from "@aws-amplify/ui-react";
 
-import { makeCDSAandTs, updateCDS, revcomp } from "./Utils";
-import { codonTableForward, codonTableReverse, aminoAcidColors, darkAminoAcidColors } from "./Codons";
+import {makeCDSAandTs, updateCDS, minEdit} from "./Utils";
 
 const SeqVizWithCDS = ({ seqData, selHandler }) => {
     // Height of div containing SeqViz component
@@ -375,305 +374,59 @@ const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
     );
 };
 
-const UneditedSeqViz = ({ seqData, name, pamVar, highlights }) => {
-    const [ annotations, setAnnotations ] = useState([]);
-    const [ translations, setTranslations ] = useState([]);
-    const ref = useRef(null);
-    // Make annotations for protospacer
-    useEffect(() => {
-        if (typeof name === "undefined") { return; }
-        let color;
-        if (name.includes("PS")) {
-            color = (pamVar === "SpNGG") ? "lightblue" : "pink";
-        } else {
-            color = "gray";
-        }
-        if (typeof name !== "undefined") {
-            const protoAnn = {
-                name: name,
-                start: 4,
-                end: 24,
-                direction: 1,
-                color: color
-            };
-            const pamAnn = {
-                name: "[PAM]",
-                start: 24,
-                end: (pamVar === "SpNGG") ? 27 : 28,
-                direction: 1,
-                color: color
-            };
-            if (("cdsList" in seqData) && (seqData.cdsList.length > 0)) {
-                const cdsAandTs = seqData.cdsList.map(cds => makeCDSAandTs(cds));
-                const cdsTranslations = cdsAandTs.map(cds => cds.translation);
-                setTranslations(cdsTranslations);
-            }
-            setAnnotations([protoAnn, pamAnn]);
-        }
-    }, [seqData, name, pamVar]);
-    // Update PAM annotation to say the PAM variant
-    useEffect(() => {
-        if (ref.current && (typeof pamVar !== "undefined")) {
-            const observer = new MutationObserver((_, observer) => {
-                const anns = (Array.from(ref.current.getElementsByClassName("la-vz-annotation"))
-                              .map(x => x.parentElement)
-                              .map(x => {
-                                  // noinspection JSUnresolvedReference
-                                  const label = x.childNodes[0].innerHTML;
-                                  const id = x.id;
-                                  return [label, id];
-                              }));
-                const pamAnn = anns.filter(x => (x[0] === "[PAM]"))[0];
-                if (typeof pamAnn === "undefined") { return; }
-                const pamObj = document.getElementById(pamAnn[1]);
-                // noinspection JSUnresolvedReference
-                pamObj.childNodes[2].innerHTML = (pamVar === "SpRY" || pamVar === "SpG")
-                                                 ? pamVar : pamVar.substring(2);
-                observer.disconnect();
-            });
-            observer.observe(ref.current, {characterData: false,
-                                           childList: true,
-                                           subtree: true,
-                                           attributes: false});
-        }
-    }, [pamVar]);
-
-    return (
-        <div ref={ref} style={{ height: "113px", width: "100%", display: "block", overflowY: "hidden" }}>
-            <SeqViz
-                { ...seqData }
-                viewer="linear"
-                annotations={annotations}
-                translations={translations}
-                highlights={highlights}
-                showComplement={false}
-                showIndex={false}
-                selection={{ start: NaN, end: NaN, clockwise: true }}
-                onSelection={() => {}}
-            />
-        </div>
-    );
-};
-
-const editSegments = (seq, cds) => {
-    const MAX_DIST = 18;
-    const { start, end, frame, direction } = cds;
-    const subSeq = seq.substring(start, end);
-    // The way I use the word "frame" in my python code
-    const pyFrame = (direction === "+") ? (3 - frame) % 3
-                                        : (frame + subSeq.length) % 3;
-    const slices = (Array.from({ length: Math.ceil((subSeq.length - pyFrame) / 3) },
-                               (_, i) => [pyFrame + 3 * i, pyFrame + 3 * i + 3])
-                         .filter(x => ((x[1] + start > 21) && (x[0] + start < 21 + MAX_DIST))));
-    const fullCodons = slices.map(x => subSeq.substring(x[0], x[1]));
-    const translation = fullCodons.map(x => (direction === "+") ? codonTableForward[x]
-                                                                : codonTableForward[revcomp(x)]);
-    let validRevTrans = translation.map((aa, i) => {
-        const codon = fullCodons[i];
-        let revTrans = codonTableReverse[aa].map(x => (direction === "+") ? x : revcomp(x));
-        const index = revTrans.indexOf(codon);
-        revTrans = [codon, ...revTrans.slice(0, index), ...revTrans.slice(index + 1)]
-        const [sStart, sEnd] = slices[i].map(x => x + start);
-        if (sStart < 21) {
-            const cLen = 21 - sStart;  // Constant len
-            revTrans = revTrans.filter(x => (codon.substring(0, cLen) === x.substring(0, cLen)));
-            revTrans = revTrans.map(x => x.substring(cLen));
-        }
-        if (sEnd > 21 + MAX_DIST) {
-            const cLen = sEnd - (21 + MAX_DIST);  // Constant len
-            revTrans = revTrans.filter(x => (codon.substring(3 - cLen, 3) === x.substring(3 - cLen, 3)));
-            revTrans = revTrans.map(x => x.substring(0, 3 - cLen));
-        }
-        return revTrans;
-    });
-    // Remove segments with only one option from end
-    while ((validRevTrans.length > 0) && (validRevTrans[validRevTrans.length - 1].length === 1)) {
-        validRevTrans = validRevTrans.slice(0, validRevTrans.length - 1);
-    }
-    // Valid segments
-    let segObjects = [{ segments: [seq],
-                        selected: [true],
-                        start: 0,
-                        end: seq.length,
-                        name: "full-sequence" }];
-    if (validRevTrans.length > 0) {
-        const firstStart = Math.max(21, slices[0][0]);
-        const lastEnd = Math.min(21 + MAX_DIST, slices[validRevTrans.length - 1][1]);
-        const vrtObjects = validRevTrans.map((x, i) => {
-            const start = Math.max(21, slices[i][0]);
-            const end = Math.min(21 + MAX_DIST, slices[i][1]);
-            return { segments: x,
-                     selected: x.map(_ => true),
-                     start,
-                     end,
-                     name: `${translation[i]}#${start}-${end}`
-            };
+const editHighlights = (ref, state, setState) => {
+    if (state.uneditedData.seq === "" || state.editedData.seq === "") { return; }
+    const {minU, minE, preLen} = minEdit(state.uneditedData.seq, state.editedData.seq);
+    let color;
+    if (minU.length === 0) { color = "lime"; }
+    else if (minE.length === 0) { color = "pink"; }
+    else { color = "cyan"; }
+    const uHighlight = { start: preLen, end: preLen + minU.length, color: color };
+    const eHighlight = { start: preLen, end: preLen + minE.length, color: color };
+    // Set unedited highlight
+    const uHighlights = minU.length > 0 ? [uHighlight] : [];
+    setState(s => ({ ...s, uneditedData: { ...s.uneditedData, highlights: uHighlights } }));
+    // Set edited highlight
+    const eHighlights = minE.length > 0 ? [eHighlight] : [];
+    setState(s => ({ ...s, editedData: { ...s.editedData, highlights: eHighlights } }));
+    // Add insertion or deletion line
+    const addIndelLine = (ref, svg_fn, offset, color) => {
+        const observer = new MutationObserver((_, observer) => {
+            const svg = svg_fn(ref);
+            if (typeof svg === "undefined") { return; }
+            const text = svg.getElementsByClassName("la-vz-seq")[0];
+            if (typeof text === "undefined") { return; }
+            const tspan = text.childNodes[offset];
+            if (typeof tspan === "undefined") { return; }
+            const x = parseFloat(tspan.getAttribute("x")) - 2;
+            const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            rect.setAttribute("style", `fill: ${color};`);
+            rect.setAttribute("height", "42");
+            rect.setAttribute("width", "2");
+            rect.setAttribute("x", x.toString());
+            rect.setAttribute("y", "-3");
+            text.parentNode.appendChild(rect);
+            observer.disconnect();
         });
-        segObjects = [{ segments: [seq.substring(0, firstStart)],
-                        selected: [true],
-                        start: 0,
-                        end: firstStart,
-                        name: "pre-seq" },
-                      ...vrtObjects,
-                      { segments: [seq.substring(lastEnd)],
-                        selected: [true],
-                        start: lastEnd,
-                        end: seq.length,
-                        name: "post-seq" }];
+        observer.observe(ref.current, {
+            characterData: false,
+            childList: true,
+            subtree: true,
+            attributes: false
+        });
+    };
+    // Add line where an insertion happens
+    if (ref.current && minU.length === 0) {
+        addIndelLine(
+            ref, ref => ref.current.getElementsByClassName("la-vz-seqblock")[0], preLen, "green"
+        );
     }
-    return segObjects;
+    // Add line where a deletion happens
+    if (ref.current && minE.length === 0) {
+        addIndelLine(
+            ref, ref => ref.current.getElementsByClassName("la-vz-seqblock")[1], preLen, "red"
+        );
+    }
 };
 
-const CODON_RE = /[ACDEFGHIKLMNPQRSTVWY*]#\d+-\d+/;
-const MENU_RE = /MENU\[(\d+)]/;
-
-const EditedSeqViz = ({ seqData, highlights }) => {
-    // Annotation management
-    const [origAnns, setOrigAnns] = useState([]);
-    const [currAnns, setCurrAnns] = useState([]);
-    const [translations, setTranslations] = useState([]);
-    // Segment objects for managing actual state
-    const [segObjs, setSegObjs] = useState([]);
-    const [menuName, setMenuName] = useState("");
-    // Ref
-    const ref = useRef(null);
-
-    // Initialization
-    useEffect(() => {
-        if (typeof seqData === "undefined") { return; }
-        let anns = "annotations" in seqData ? seqData.annotations : [];
-        const uneditable = { name: "", start: 0, end: 21, direction: 0, color: "gray" };
-        anns = [ ...anns, uneditable ];
-        if (("cdsList" in seqData) && (seqData.cdsList.length > 0)) {
-            const cdsAandTs = seqData.cdsList.map(cds => makeCDSAandTs(cds));
-            const cdsTranslations = cdsAandTs.map(cds => cds.translation);
-            setTranslations(cdsTranslations);
-            const seqSegObjs = editSegments(seqData.seq, seqData.cdsList[0]);
-            const silentAnns = (seqSegObjs.filter(x => CODON_RE.test(x.name))
-                                          .map(x => {
-                                              return { name: x.name,
-                                                       start: x.start,
-                                                       end: x.end,
-                                                       direction: 0,
-                                                       color: aminoAcidColors[x.name.charAt(0)] }
-                                          }));
-            anns = [...anns, ...silentAnns];
-            setSegObjs(seqSegObjs);
-        }
-        setOrigAnns(anns);
-        setCurrAnns(anns);
-    }, [seqData]);
-    // Update components of DOM dynamically since SeqViz is unnecessarily restrictive
-    useEffect(() => {
-        if (ref.current) {
-            const observer = new MutationObserver((_, observer) => {
-                const annObjs = Array.from(ref.current.getElementsByClassName("la-vz-annotation"))
-                                .map(x => x.parentElement);
-                // noinspection JSUnresolvedReference
-                const annLabels = annObjs.map(x => ([x.childNodes[0].innerHTML, x.id]));
-                const mainAnnMap = Object.fromEntries(annLabels.filter(x => CODON_RE.test(x[0])));
-                const menuAnnMap = Object.fromEntries(annLabels.filter(x => MENU_RE.test(x[0])));
-                // Update labels with # of selected silent edits
-                segObjs.map(segObj => {
-                    if (segObj.name in mainAnnMap) {
-                        const count = segObj.selected.filter(Boolean).length;
-                        const annId = mainAnnMap[segObj.name];
-                        const obj = document.getElementById(annId);
-                        if (obj !== null) { obj.childNodes[2].innerHTML = `${count}`; }
-                    }
-                    return null;
-                });
-                // Set annotation labels if a menu is open
-                const segObjMap = Object.fromEntries(segObjs.map(x => [x.name, x]));
-                if (menuName in segObjMap) {
-                    const segObj = segObjMap[menuName];
-                    segObj.segments.map((x, i) => {
-                        const name = `MENU[${i}]`;
-                        if (name in menuAnnMap) {
-                            const obj = document.getElementById(menuAnnMap[name]);
-                            if (obj !== null) {
-                                obj.childNodes[2].innerHTML = x;
-                                obj.onmousedown = (() => {
-                                    setSegObjs(prevSegObjs => {
-                                        const oldMap = Object.fromEntries(prevSegObjs.map(x => [x.name, x]));
-                                        const segObj = oldMap[menuName];
-                                        const menuIdx = parseInt(MENU_RE.exec(name)[1]);
-                                        let selected = segObj.selected;
-                                        selected[menuIdx] = !selected[menuIdx];
-                                        // Don't update if selection would be invalid
-                                        if (selected.filter(Boolean).length === 0) {
-                                            return prevSegObjs;
-                                        } else {
-                                            const segObjIdx = prevSegObjs.indexOf(segObj);
-                                            const newSegObj = { ...segObj, selected };
-                                            const newSegObjs = [ ...prevSegObjs.slice(0, segObjIdx),
-                                                                 newSegObj,
-                                                                 ...prevSegObjs.slice(segObjIdx + 1) ];
-                                            return newSegObjs.slice(0, prevSegObjs.length);
-                                        }
-                                    });
-                                });
-                            }
-                        }
-                        return null;
-                    })
-                }
-                observer.disconnect();
-            });
-            observer.observe(ref.current, {characterData: false,
-                                           childList: true,
-                                           subtree: true,
-                                           attributes: false});
-        }
-    }, [currAnns, segObjs, menuName]);
-    // Set annotations when a menu is open
-    useEffect(() => {
-        const segObjMap = Object.fromEntries(segObjs.map(x => [x.name, x]));
-        if (menuName === "") {
-            setCurrAnns(origAnns);
-        } else {
-            const segObj = segObjMap[menuName];
-            const { segments, selected, start, end, name } = segObj;
-            const menuAnns = segments.map((x, i) => {
-                const aa = name.charAt(0);
-                const color = selected[i] ? aminoAcidColors[aa] : darkAminoAcidColors[aa];
-                return { name: `MENU[${i}]`,
-                         start,
-                         end,
-                         direction: 0,
-                         color};
-            });
-            setCurrAnns([...origAnns, ...menuAnns]);
-        }
-    }, [menuName, segObjs, origAnns]);
-    // Expand "menu" when clicked
-    const onSelection = (e) => {
-        if ((e.type === "ANNOTATION") && (CODON_RE.test(e.name))) {
-            if (menuName === e.name) {
-                setMenuName("");
-            } else {
-                setMenuName(e.name);
-            }
-        }
-    };
-
-    return (
-        <div ref={ref} style={{ height: "100%", verticalAlign: "top" }}>
-            <div style={{ height: "208px", width: "100%", display: "block" }}>
-                <SeqViz
-                    { ...seqData }
-                    annotations={currAnns}
-                    translations={translations}
-                    highlights={highlights}
-                    viewer="linear"
-                    showComplement={false}
-                    showIndex={false}
-                    selection={{ start: NaN, end: NaN, clockwise: true }}
-                    onSelection={onSelection}
-                />
-            </div>
-        </div>
-    );
-}
-
-export { SeqVizWithCDS, EditableSeqViz, UneditedSeqViz, EditedSeqViz };
+export { SeqVizWithCDS, EditableSeqViz, editHighlights };
