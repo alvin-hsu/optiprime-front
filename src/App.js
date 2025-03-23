@@ -14,6 +14,7 @@ import "@aws-amplify/ui-react/styles.css";
 
 import REST from "./REST";
 import Home from "./Home";
+import Job from "./Job"
 import Jobs from "./Jobs";
 import About from "./About";
 import Design from "./Design";
@@ -208,12 +209,6 @@ const Header = () => {
     );
 };
 
-
-
-
-
-
-
 const App = () => {
     const location = useLocation();
 
@@ -233,6 +228,7 @@ const App = () => {
                     {/* Protected routes */}
                     <Route path="/design" element={<ProtectedRoute><Design /></ProtectedRoute>} />
                     <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
+                    <Route path="/jobs/:jid" element={<ProtectedRoute><Job /></ProtectedRoute>}></Route>
                     {/* Debugging/scratch pages */}
                     <Route path="/seqviz" element={<SeqVizTest />} />
                     <Route path="/scratch" element={<Scratch />} />

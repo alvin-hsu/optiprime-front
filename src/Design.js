@@ -32,38 +32,12 @@ import {
     fetchAuth, revcomp
 } from "./Utils";
 import ClinvarAutocomplete from "./ClinvarAutocomplete";
-import {EditableSeqViz, EditedSeqViz, SeqVizWithCDS, UneditedSeqViz} from "./ModdedSeqViz";
+import {EditableSeqViz, SeqVizWithCDS, editHighlights } from "./ModdedSeqViz";
 import { useNavigate } from "react-router-dom";
 import {codonTableForward, codonTableReverse} from "./Codons";
 
 const _CONTEXT_LEN = 110;
 const _SEARCH_DIST = 18;
-
-const addIndelLine = (ref, svg_fn, offset, color) => {
-    const observer = new MutationObserver((_, observer) => {
-        const svg = svg_fn(ref);
-        if (typeof svg === "undefined") { return; }
-        const text = svg.getElementsByClassName("la-vz-seq")[0];
-        if (typeof text === "undefined") { return; }
-        const tspan = text.childNodes[offset];
-        if (typeof tspan === "undefined") { return; }
-        const x = parseFloat(tspan.getAttribute("x")) - 2;
-        const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        rect.setAttribute("style", `fill: ${color};`);
-        rect.setAttribute("height", "42");
-        rect.setAttribute("width", "2");
-        rect.setAttribute("x", x.toString());
-        rect.setAttribute("y", "-3");
-        text.parentNode.appendChild(rect);
-        observer.disconnect();
-    });
-    observer.observe(ref.current, {
-        characterData: false,
-        childList: true,
-        subtree: true,
-        attributes: false
-    });
-};
 
 const Name = ({ state, setState, pushError, popError }) => {
     // Local state
@@ -574,27 +548,8 @@ const DesignPage = ({ state, setState, onNext }) => {
     }, [state.uneditedData.seq, state.editedData.seq]);  // eslint-disable-line
 
     // Add indel line
-    useEffect(() => {
-        const {minU, minE, preLen} = minEdit(state.uneditedData.seq, state.editedData.seq);
-        // Add line where an insertion happens
-        if (ref.current && minU.length === 0) {
-            addIndelLine(
-                ref,
-                ref => ref.current.getElementsByClassName("la-vz-seqblock")[0],
-                preLen,
-                "green"
-            );
-        }
-        // Add line where a deletion happens
-        if (ref.current && minE.length === 0) {
-            addIndelLine(
-                ref,
-                ref => ref.current.getElementsByClassName("la-vz-seqblock")[1],
-                preLen,
-                "red"
-            );
-        }
-    }, [state.uneditedData.seq, state.editedData.seq]);
+    useEffect(() => editHighlights(ref, state, setState),
+              [ref, state.uneditedData.seq, state.editedData.seq]);  // eslint-disable-line
 
     return (
         <Grid
@@ -794,7 +749,7 @@ const reduceSegments = (segments, offset) => {
     return retval;
 };
 
-const PreviewPage = ({ state }) => {
+const PreviewPage = ({ state, setState }) => {
     const {tokens} = useTheme();
     const navigate = useNavigate();
     // Extract state
@@ -823,28 +778,9 @@ const PreviewPage = ({ state }) => {
             .then(r => r.json())
             .then(j => setPamdaData(j));
     }, []);
-    // Add indel line
-    useEffect(() => {
-        const {minU, minE, preLen} = minEdit(uSeq, eSeq);
-        // Add line where an insertion happens
-        if (ref.current && minU.length === 0) {
-            addIndelLine(
-                ref,
-                ref => ref.current.getElementsByClassName("la-vz-seqblock")[0],
-                preLen,
-                "green"
-            );
-        }
-        // Add line where a deletion happens
-        if (ref.current && minE.length === 0) {
-            addIndelLine(
-                ref,
-                ref => ref.current.getElementsByClassName("la-vz-seqblock")[1],
-                preLen,
-                "red"
-            );
-        }
-    }, [uSeq, eSeq]);
+    // Add highlights
+    useEffect(() => editHighlights(ref, state, setState),
+              [ref, state.uneditedData.seq, state.editedData.seq]);  // eslint-disable-line
     // Find all protospacers and assign scores
     useEffect(() => {
         if (Object.keys(pamdaData).length === 0) {
@@ -1130,24 +1066,6 @@ const Design = () => {
         };
         window.getStateObject = () => upperState;
     }, [state]);
-
-    // HIGHLIGHT EDIT
-    useEffect(() => {
-        if (state.uneditedData.seq === "" || state.editedData.seq === "") { return; }
-        const {minU, minE, preLen} = minEdit(state.uneditedData.seq, state.editedData.seq);
-        let color;
-        if (minU.length === 0) { color = "lime"; }
-        else if (minE.length === 0) { color = "pink"; }
-        else { color = "cyan"; }
-        const uHighlight = { start: preLen, end: preLen + minU.length, color: color };
-        const eHighlight = { start: preLen, end: preLen + minE.length, color: color };
-        // Set unedited highlight
-        const uHighlights = minU.length > 0 ? [uHighlight] : [];
-        setState(s => ({ ...s, uneditedData: { ...s.uneditedData, highlights: uHighlights } }));
-        // Set edited highlight
-        const eHighlights = minE.length > 0 ? [eHighlight] : [];
-        setState(s => ({ ...s, editedData: { ...s.editedData, highlights: eHighlights } }));
-    }, [state.uneditedData.seq, state.editedData.seq]);  // eslint-disable-line
 
     return (
         <div>

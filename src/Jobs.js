@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Table,
   TableCell,
@@ -7,40 +8,48 @@ import {
   TableRow,
 } from "@aws-amplify/ui-react";
 
-export default function Jobs() {
+import { fetchAuth } from "./Utils";
+
+const Jobs = () => {
+    const [jobs, setJobs] = useState([]);
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        fetchAuth("ac_token", "https://api.optipri.me/jobs")
+        .then(resp => resp.json())
+        .then(result => {
+            if (result["Count"] > 0) {
+                const items = result["Items"];
+                setJobs(items.map(x => ({
+                    id: x.jobID.S,
+                    name: x.name.S,
+                    status: x.status.S
+                })))
+            }
+        })
+    }, []);
+
+    // DC TODO: Fix styling to make table rows constant height
     return (
-        <>
-            <Table
-                caption=""
-                size="small"
-                highlightOnHover={true}
-                width="80%"
-            >
-                <TableHead borderWidth="1px" borderColor="black">
-                  <TableRow style={{ borderColor: "black", borderWidth: "2px" }}>
-                    <TableCell as="th">Citrus</TableCell>
-                    <TableCell as="th">Stone Fruit</TableCell>
-                    <TableCell as="th">Berry</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  <TableRow>
-                    <TableCell>Orange</TableCell>
-                    <TableCell>Nectarine</TableCell>
-                    <TableCell>Raspberry</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Grapefruit</TableCell>
-                    <TableCell>Apricot</TableCell>
-                    <TableCell>Blueberry</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell>Lime</TableCell>
-                    <TableCell>Peach</TableCell>
-                    <TableCell>Strawberry</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-        </>
-    )
-}
+        <Table highlightOnHover={true}>
+            <TableHead borderWidth="1px" borderColor="black" height="20px">
+                <TableRow height="20px">
+                    <TableCell as="th">Job ID</TableCell>
+                    <TableCell as="th">Job Name</TableCell>
+                    <TableCell as="th">Status</TableCell>
+                </TableRow>
+            </TableHead>
+            <TableBody>
+            {jobs.map(j =>
+                <TableRow height="20px" onClick={() => navigate(`${j.id}`)}>
+                    <TableCell>{j.id}</TableCell>
+                    <TableCell>{j.name}</TableCell>
+                    <TableCell>{j.status}</TableCell>
+                </TableRow>
+            )}
+            </TableBody>
+        </Table>
+    );
+};
+
+export default Jobs;
