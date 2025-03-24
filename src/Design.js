@@ -711,7 +711,7 @@ const sliceSegments = (segments, start, end) => {
         total += segLen;
         if (total <= start || oldTotal >= end) {}
         else if (oldTotal < start) {
-            retval = [...retval, [segment[0].slice(start - oldTotal)]];
+            retval = [...retval, [segment[0].slice(start - oldTotal, end - oldTotal)]];
         } else if (total < end) {
             retval = [...retval, segment];
         } else {
@@ -745,7 +745,7 @@ const reduceSegments = (segments, offset) => {
         }
     });
     tail = tail.join("");
-    retval = [...retval, [tail]];
+    retval = tail !== "" ? [...retval, [tail]] : retval;
     return retval;
 };
 
@@ -910,7 +910,7 @@ const PreviewPage = ({ state, setState }) => {
                                            [clicked] : !prevSelected[clicked] }));
             setClicked("");
         }
-    }, [clicked])
+    }, [clicked]);
 
     const onSubmit = (_) => {
         const minState = {
@@ -935,15 +935,14 @@ const PreviewPage = ({ state, setState }) => {
             body: JSON.stringify(minState)
         })
         .then(resp => {
-            return [resp.status, resp.text()];
-        })
-        .then(st => {
-            const [status, text] = st;
-            if (status === 200 || status === 304) {
-                return JSON.parse(text);
+            if (resp.ok) {
+                return resp.json();
             } else {
-                throw new Error(text);
+                throw new Error(resp.body());
             }
+        })
+        .then(body => {
+            navigate(`/jobs/${body.jobID}`);
         })
         .catch(e => {
             setInfo(e.toString());

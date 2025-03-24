@@ -313,16 +313,6 @@ export const revcomp = (seq) => {
 };
 
 /*
- * Make a random string for an ID
- */
-export const randomId = (len) => {
-    const charSet = "0123456789ABCDEF";
-    const chars = [ ...Array(len) ].map(_ => (
-        charSet.charAt(Math.floor(Math.random() * charSet.length))));
-    return chars.join("");
-};
-
-/*
  * Check that an RSA signature is valid. Probably not 100% secure but we'll have
  * backend checks as well.
  */
