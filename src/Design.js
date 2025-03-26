@@ -624,7 +624,6 @@ const moveToFront = (a, x) => {
 
 const splitDNAbyCDS = (dna, cdsList) => {
     // Sort CDS segments by start coordinate
-    console.log(cdsList)
     cdsList.sort((a, b) => a.start - b.start);
     let result = [];
     let lastIndex = 0;
