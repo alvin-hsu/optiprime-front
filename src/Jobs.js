@@ -18,13 +18,17 @@ const Jobs = () => {
         fetchAuth("ac_token", "https://api.optipri.me/jobs")
         .then(resp => resp.json())
         .then(result => {
+            console.log(result)
             if (result["Count"] > 0) {
                 const items = result["Items"];
-                setJobs(items.map(x => ({
-                    id: x.jobID.S,
-                    name: x.name.S,
-                    status: x.status.S
-                })))
+                setJobs(items
+                    .toSorted((a, b) => (a.submitTime.S < b.submitTime.S ? 1 : -1))
+                    .map(x => ({ id: x.jobID.S,
+                                 name: x.name.S,
+                                 status: x.status.S
+                        })
+                    )
+                );
             }
         })
     }, []);

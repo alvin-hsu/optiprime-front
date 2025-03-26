@@ -624,12 +624,12 @@ const moveToFront = (a, x) => {
 
 const splitDNAbyCDS = (dna, cdsList) => {
     // Sort CDS segments by start coordinate
+    console.log(cdsList)
     cdsList.sort((a, b) => a.start - b.start);
     let result = [];
     let lastIndex = 0;
     for (const cds of cdsList) {
-        const start = cds.direction === "+" ? cds.start : cds.end;
-        const end = cds.direction === "+" ? cds.end : cds.start;
+        const { start, end } = cds;
         // Append non-CDS sequence (as one continuous block) from the end of the previous segment to the start of the CDS.
         if (start > lastIndex) {
             result = [...result, [dna.slice(lastIndex, start)]];
@@ -749,7 +749,7 @@ const reduceSegments = (segments, offset) => {
     return retval;
 };
 
-const PreviewPage = ({ state, setState }) => {
+const PreviewPage = ({ state, setState, onBack }) => {
     const {tokens} = useTheme();
     const navigate = useNavigate();
     // Extract state
@@ -792,8 +792,8 @@ const PreviewPage = ({ state, setState }) => {
         const segmentsF = splitDNAbyCDS(eSeq, editedData.cdsList);
         const revCDSList = editedData.cdsList.map(c => ({
             direction: c.direction === "+" ? "-" : "+",
-            start: eSeq.length - c.start,
-            end: eSeq.length - c.end,
+            start: eSeq.length - c.end,
+            end: eSeq.length - c.start,
             frame: c.frame
         }));
         const segmentsR = splitDNAbyCDS(eSeqR, revCDSList);
@@ -816,6 +816,7 @@ const PreviewPage = ({ state, setState }) => {
                                       start20: uSeq.length - x.end20,
                                       end20: uSeq.length - x.start20 }));
         const entries = [ ...fEntries, ...rEntries ];
+        console.log(entries);
         const pamVars = entries
                         .map(x => x.pamVar)
                         .filter((v, i, a) => a.indexOf(v) === i);  // Gets unique PAMs used
@@ -1007,11 +1008,17 @@ const PreviewPage = ({ state, setState }) => {
             <Flex justifyContent="space-between">
                 <Flex gap={tokens.space.medium.value}>
                     <Button
+                        children="Back"
+                        type="submit"
+                        variation="primary"
+                        onClick={onBack}
+                    />
+                    <Button
                         children="Submit"
                         type="submit"
                         variation="primary"
                         onClick={onSubmit}
-                    ></Button>
+                    />
                 </Flex>
             </Flex>
         </Grid>
