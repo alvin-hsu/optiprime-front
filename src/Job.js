@@ -29,7 +29,6 @@ const fetchJobData = async (jobID) => {
     return data;
 };
 
-// TODO: Figure out why this doesn't update
 const useJobDataResource = (jobID) => {
     if (!(jobID in resource) || typeof resource[jobID] === "undefined") {
         resource[jobID] = suspensePromiseWrapper(fetchJobData(jobID));
@@ -44,7 +43,6 @@ const JobComponent = () => {
     const [jobData, setJobData] = useState(jobDataResource.read());  // Blocks until data is ready
     const ref = useRef(null);
 
-    console.log(jobData);  // AH TODO: remove in production
     const protoAnns = jobData.subJobData
     .map((sj, i) => {
         let name = sj.name.split("_");
@@ -101,7 +99,7 @@ const JobComponent = () => {
 const Job = () => {
     return (
         <ErrorBoundary>
-            <Suspense fallback={<div>Loading data...</div>}>
+            <Suspense fallback={<div>Loading data...</div>}>  {/* DC TODO: style fallback */}
                 <JobComponent />
             </Suspense>
         </ErrorBoundary>
