@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState} from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Table,
@@ -18,7 +18,6 @@ const Jobs = () => {
         fetchAuth("ac_token", "https://api.optipri.me/jobs")
         .then(resp => resp.json())
         .then(result => {
-            console.log(result)
             if (result["Count"] > 0) {
                 const items = result["Items"];
                 setJobs(items
