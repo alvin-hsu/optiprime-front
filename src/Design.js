@@ -29,15 +29,19 @@ import {
     rsIDtoHg38Coords,
     updateCDS,
     cvIDtoHg38Coords,
-    fetchAuth, revcomp
+    fetchAuth,
+    revcomp,
+    sliceSegments,
+    reduceSegments,
+    splitDNAbyCDS,
+    findProtosDirection,
+    scaleProtoScore
 } from "./Utils";
 import ClinvarAutocomplete from "./ClinvarAutocomplete";
 import {EditableSeqViz, SeqVizWithCDS, editHighlights } from "./ModdedSeqViz";
 import { useNavigate } from "react-router-dom";
-import {codonTableForward, codonTableReverse} from "./Codons";
 
 const _CONTEXT_LEN = 110;
-const _SEARCH_DIST = 18;
 
 const Name = ({ state, setState, pushError, popError }) => {
     // Local state
@@ -612,140 +616,6 @@ const DesignPage = ({ state, setState, onNext }) => {
             </>}
         </Grid>
     );
-};
-
-const moveToFront = (a, x) => {
-    const idx = a.indexOf(x);
-    if (idx === -1) {
-        throw new Error("Bad idx")
-    }
-    return [x, ...a.toSpliced(idx, 1)];
-}
-
-const splitDNAbyCDS = (dna, cdsList) => {
-    // Sort CDS segments by start coordinate
-    cdsList.sort((a, b) => a.start - b.start);
-    let result = [];
-    let lastIndex = 0;
-    for (const cds of cdsList) {
-        const { start, end } = cds;
-        // Append non-CDS sequence (as one continuous block) from the end of the previous segment to the start of the CDS.
-        if (start > lastIndex) {
-            result = [...result, [dna.slice(lastIndex, start)]];
-        }
-        let segment = dna.slice(start, end);
-        // For minus-strand CDS, reverse-complement the sequence.
-        if (cds.direction === '-') {
-            segment = revcomp(segment);
-        }
-        // Apply the frame:
-        // The first `frame` bases (if any) remain unsplit.
-        // The rest is split into groups of three (codons).
-        const frame = cds.frame || 0;
-        const prefix = segment.slice(0, frame);
-        const remainder = segment.slice(frame);
-        // Use a regex to match groups of 1-3 characters.
-        let codons = remainder.match(/.{1,3}/g) || [];
-        codons = (prefix ? [prefix, ...codons] : codons);
-        codons = codons.map(x => x.length === 3 ? moveToFront(codonTableReverse[codonTableForward[x]], x) : [x]);
-        if (cds.direction === "-") {
-            codons = codons.map(x => x.map(revcomp)).toReversed();
-        }
-        result = [...result, ...codons];
-        lastIndex = end;
-    }
-    // Append any trailing non-CDS sequence.
-    if (lastIndex < dna.length) {
-        result = [...result, [dna.slice(lastIndex)]];
-    }
-    return result;
-}
-
-const findProtosDirection = (uSeq, eSeq, direction, pamdaData) => {
-    const pamStr = Object.keys(pamdaData).join("|");
-    const PAM_RE = new RegExp(`(?=[ACGT]{24}(?:${pamStr}))`, "g");
-    const {minU, preLen, postLen} = minEdit(uSeq, eSeq);
-    const uDelta = uSeq.length > eSeq.length ? uSeq.length - eSeq.length : 0;
-    const eDelta = eSeq.length > uSeq.length ? eSeq.length - uSeq.length : 0;
-    const preHom = uSeq.substring(0, preLen);
-    const postHom = uSeq.substring(uSeq.length - postLen);
-    const uLen = minU.length;
-    const search = (preHom.substring(preLen - _SEARCH_DIST - 21) +
-        minU.substring(0, Math.min(uLen, 7)) +
-        postHom.substring(0, Math.max(0, 7 - Math.min(uLen, 7))));
-    const idxs = [...search.matchAll(PAM_RE)].map(x => x.index);
-    return idxs.map(x => {
-        const idx = x + (preLen - _SEARCH_DIST - 21);  // Index of match start
-        const nickDist = preHom.length - (idx + 21) + 1;
-        const start20 = idx + 4;
-        const end20 = start20 + 20;
-        const proto30 = uSeq.substring(idx, idx + 30);
-        const unedited = uSeq.substring(start20 - 4, start20 + 71 + uDelta);
-        const edited =   eSeq.substring(start20 - 4, start20 + 71 + eDelta);
-        const offset = edited.length - minEdit(unedited, edited).postLen;
-        const pam = uSeq.substring(idx + 24, idx + 28);
-        const [pamVar, pamScore] = pamdaData[pam]
-        return { direction, start20, end20, proto30, unedited, edited,
-                 offset, pam, pamVar, pamScore, nickDist };
-    });
-};
-
-const scaleProtoScore = (score, pamda) => {
-    const PAMDA_BIAS = -1.45;
-    const SLOPE = 1;
-    const h = Math.min(PAMDA_BIAS, pamda);
-    const tenTerm = Math.pow(10, PAMDA_BIAS - h);
-    const expTerm = 1 + Math.pow(10, -SLOPE * score);
-    const rawScaled = -Math.log10(tenTerm * expTerm - 1) / SLOPE;
-    return Math.max(-5, rawScaled);
-};
-
-const sliceSegments = (segments, start, end) => {
-    let oldTotal = 0, total = 0;
-    let retval = [];
-    segments.forEach(segment => {
-        const segLen = segment[0].length;
-        // oldTotal: # of characters before current, total: # of characters after current
-        oldTotal = total;
-        total += segLen;
-        if (total <= start || oldTotal >= end) {}
-        else if (oldTotal < start) {
-            retval = [...retval, [segment[0].slice(start - oldTotal, end - oldTotal)]];
-        } else if (total < end) {
-            retval = [...retval, segment];
-        } else {
-            retval = [...retval, [segment[0].slice(0, end - oldTotal)]];
-        }
-    });
-    return retval;
-};
-
-const reduceSegments = (segments, offset) => {
-    let oldTotal = 0, total = 0;
-    let retval = [];
-    let segment0 = [];
-    let tail = [];
-    segments.forEach(segment => {
-        const segLen = segment[0].length;
-        oldTotal = total;
-        total += segLen;
-        if (total < 21) {
-            segment0 = [...segment0, segment[0]];
-        } else if (oldTotal < 21) {
-            const prefix = segment[0].slice(0, 21 - oldTotal);
-            segment0 = [...segment0, prefix].join("");
-            const trimmed = segment.filter(x => x.slice(0, 21 - oldTotal) === prefix)
-                                   .map(x => x.slice(21 - oldTotal));
-            retval = total === 21 ? [[segment0]] : [[segment0], trimmed];
-        } else if (oldTotal < offset || retval.length < 5) {
-            retval = [...retval, segment];
-        } else {
-            tail = [...tail, segment[0]];
-        }
-    });
-    tail = tail.join("");
-    retval = tail !== "" ? [...retval, [tail]] : retval;
-    return retval;
 };
 
 const PreviewPage = ({ state, setState, onBack }) => {
