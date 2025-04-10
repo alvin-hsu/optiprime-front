@@ -1,7 +1,7 @@
 import { Buffer } from "buffer";
 import { KJUR } from "jsrsasign";
 import Cookies from "js-cookie";
-import { codonTableForward, codonTableReverse } from "./Codons";
+import { codonTableForward, codonTableReverse } from "./Codons.js";
 
 // ****************************** GENOMIC INFO APIs ****************************** 
 /* Scraping various web APIs. Each function returns a Promise for the desired return type. */
@@ -494,3 +494,36 @@ export const suspensePromiseWrapper = (promise) => {
         }
     };
 };
+
+export const downloadBinary = (resp) => {
+    const EXTENSIONS = {
+        "application/gzip": ".gz",
+        "application/zip": ".zip"
+    }
+    if (!resp.ok) { throw new Error(resp.status); }
+    return Promise.all([resp.text(), resp.headers.get("content-type"), resp.headers.get("content-disposition")])
+           .then(([text, contentType, contentDisposition]) => {
+               // Decode base64
+               const binary = atob(text);
+               const bytes = new Uint8Array(binary.length);
+               for (let i = 0; i < binary.length; i++) {
+                   bytes[i] = binary.charCodeAt(i);
+               }
+               const blob = new Blob([bytes], { type: contentType })
+               // Extract filename from header
+               const ext = contentType in EXTENSIONS ? EXTENSIONS[contentType] : "";
+               let filename = `download${ext}`;
+               const match = /filename="([^"]+)"/.exec(contentDisposition);
+               if (match && match[1]) {
+                   filename = match[1];
+               }
+               const url = window.URL.createObjectURL(blob);
+               const a = document.createElement("a");
+               a.href = url;
+               a.download = filename;
+               document.body.appendChild(a);
+               a.click();
+               a.remove();
+               window.URL.revokeObjectURL(url);
+           });
+}
