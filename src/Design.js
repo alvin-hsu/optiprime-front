@@ -38,7 +38,7 @@ import {
     scaleProtoScore
 } from "./Utils";
 import ClinvarAutocomplete from "./ClinvarAutocomplete";
-import {EditableSeqViz, SeqVizWithCDS, editHighlights } from "./ModdedSeqViz";
+import { EditableSeqViz, SeqVizWithCDS, editHighlights } from "./ModdedSeqViz";
 import { useNavigate } from "react-router-dom";
 
 const _CONTEXT_LEN = 110;
@@ -719,7 +719,7 @@ const PreviewPage = ({ state, setState, onBack }) => {
                 const scoreData = Array.isArray(data) ? data : [data];
                 const cacheUpdate = Object.fromEntries(nonCached.map((x, i) => [x, scoreData[i]]));
                 localStorage.setItem("protoScores", JSON.stringify({ ...scoreCache,
-                    ...cacheUpdate }));
+                                                                     ...cacheUpdate }));
                 setProtos(oldProtos => oldProtos.map(x => x.proto30 in cacheUpdate
                     ? { ...x,
                         score: scaleProtoScore(cacheUpdate[x.proto30],
