@@ -119,8 +119,8 @@ const DARK_COLORS = [
 ];
 
 export const aminoAcidColors = Object.fromEntries(
-    Object.keys(codonTableReverse).map( a => [ a, COLORS[a.charCodeAt(0) % COLORS.length] ] )
+    Object.keys(codonTableReverse).map(a => [a, COLORS[a.charCodeAt(0) % COLORS.length]])
 );
 export const darkAminoAcidColors = Object.fromEntries(
-    Object.keys(codonTableReverse).map( a => [ a, DARK_COLORS[a.charCodeAt(0) % COLORS.length] ] )
+    Object.keys(codonTableReverse).map(a => [a, DARK_COLORS[a.charCodeAt(0) % COLORS.length]])
 );

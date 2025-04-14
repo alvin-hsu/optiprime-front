@@ -1,4 +1,5 @@
 import React, {useEffect, useRef, useState} from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
     Alert,
     Autocomplete,
@@ -39,7 +40,7 @@ import {
 } from "./Utils";
 import ClinvarAutocomplete from "./ClinvarAutocomplete";
 import { EditableSeqViz, SeqVizWithCDS, editHighlights } from "./ModdedSeqViz";
-import { useLocation, useNavigate } from "react-router-dom";
+import { codonTableForward, aminoAcidColors, darkAminoAcidColors } from "./Codons";
 
 const _CONTEXT_LEN = 110;
 
@@ -630,13 +631,18 @@ const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
     // Protospacer search and selection
     const [protos, setProtos] = useState([]);
     const [selected, setSelected] = useState({});
-    const [clicked, setClicked] = useState("");
+    const [cProto, setCProto] = useState("");  // Clicked protospacer
+    const [segInfo, setSegInfo] = useState({});
+    const [cSeg, setCSeg] = useState("");  // Clicked segment
+    const [dispSeg, setDispSeg] = useState("");
     // HT-PAMDA data for PAM variants
     const [useVars, setUseVars] = useState(false);  // Using PAM variants?
     const [pamdaData, setPamdaData] = useState({});
     // Misc. state
     const [info, setInfo] = useState("");  // Info text to display to user
+    const [useSilents, setUseSilents] = useState(true);
     const [protoAnns, setProtoAnns] = useState([]);  // Protospacer annotations
+    const [segAnns, setSegAnns] = useState([]);  // Edited segment annotations
     // Ref to unedited
     const ref = useRef(null);
 
@@ -685,7 +691,6 @@ const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
                                       start20: uSeq.length - x.end20,
                                       end20: uSeq.length - x.start20 }));
         const entries = [ ...fEntries, ...rEntries ];
-        console.log(entries);
         const pamVars = entries
                         .map(x => x.pamVar)
                         .filter((v, i, a) => a.indexOf(v) === i);  // Gets unique PAMs used
@@ -736,16 +741,32 @@ const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
     }, [pamdaData, uSeq, eSeq, uSeqR, eSeqR, editedData.cdsList]);
 
     // PROTOSPACER SELECTION HANDLING
-    // Update protoMap whenever objects in protos update
     useEffect(() => {
         setSelected(prevSelected => (
             Object.fromEntries(protos.map(p => [p.id, prevSelected[p.id] ?? false]))
         ));
+        setSegInfo(Object.fromEntries(protos.map(p =>
+                       [p.id, {
+                           direction: p.direction,
+                           start: p.direction === "+" ? p.start20 - 4 : p.end20 + 4,
+                           segments: p.segments,
+                           segSel: p.segments.map(() => true)
+                       }]
+        )));
     }, [protos]);
+    useEffect(() => {
+        setSegInfo(prevSegInfo => Object.fromEntries(
+            Object.entries(prevSegInfo)
+            .map(k_v => ([k_v[0], {
+                ...k_v[1],
+                segSel: k_v[1].segSel.map(() => useSilents)
+            }]))
+        ));
+    }, [useSilents]);
     // Update annotations when protos updates or when useVars is toggled
     useEffect(() => {
         const annotations = protos
-            .filter(x => x.pamVar === "SpNGG" || useVars)  // TODO? Cutoffs
+            .filter(x => x.pamVar === "SpNGG" || (useVars && x.score > -1))
             .map(x => {
                 const name = ("score" in x) && (typeof x.score !== "undefined")
                              ? `${x.id} [PScore ${x.score.toFixed(2)}]`
@@ -766,21 +787,89 @@ const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
         setProtoAnns(annotations);
     }, [protos, useVars]);
 
-    const selHandler = (e) => {
-        const PROTO_RE = /Sp\w{3,4}\d+/;
+    const PROTO_RE = /Sp\w+\d+/;
+    const protoHandler = (e) => {
         const name = e.name.split(" ")[0];
         if (PROTO_RE.test(name)) {
-            setClicked(name);
+            setCProto(name);
+            if (!selected[name]) {
+                setDispSeg(name);
+            } else {
+                setDispSeg("");
+            }
         }
     };
     useEffect(() => {
-        const PROTO_RE = /Sp\w{3,4}\d+/;
-        if (PROTO_RE.test(clicked)) {
+        if (PROTO_RE.test(cProto)) {
             setSelected(prevSelected => ({ ...prevSelected,
-                                           [clicked] : !prevSelected[clicked] }));
-            setClicked("");
+                                           [cProto] : !prevSelected[cProto] }));
+            setCProto("");
         }
-    }, [clicked]);
+    }, [cProto]);  // eslint-disable-line
+
+    const SEG_RE = /(Sp\w+\d+)_([ACDEFGHIKLMNPQRSTVWY*])(\d+)/;
+    const segHandler = (e) => {
+        if (SEG_RE.test(e.name)) {
+            setCSeg(e.name);
+        }
+    };
+    useEffect(() => {
+        const match = SEG_RE.exec(cSeg);
+        if (match !== null) {
+            const protoId = match[1];
+            const idx = parseInt(match[3]);
+            setSegInfo(prevSegInfo => ({
+                ...prevSegInfo,
+                [protoId]: {
+                    ...prevSegInfo[protoId],
+                    segSel: [...prevSegInfo[protoId].segSel.slice(0, idx),
+                             !prevSegInfo[protoId].segSel[idx],
+                             ...prevSegInfo[protoId].segSel.slice(idx + 1)]
+                }
+            }));
+            setCSeg("");
+        }
+    }, [cSeg]);  //eslint-disable-line
+
+    useEffect(() => {
+        if (dispSeg !== "") {
+            const protoInfo = segInfo[dispSeg];
+            const { start, direction, segments, segSel } = protoInfo;
+            const eDir = editedData.cdsList.length > 0 ? editedData.cdsList[0].direction : "+";
+            let anns = [];
+            let idx = start;
+            for (const [i, seg] of segments.entries()) {
+                const sLen = seg[0].length;
+                const annStart = direction === "+" ? idx : idx - sLen;
+                const annEnd = direction === "+" ? idx + sLen : idx;
+                idx = direction === "+" ? idx + sLen : idx - sLen;
+                if (sLen > 3) continue;
+                let codon;
+                if (sLen === 1) {
+                    const prevSeg0 = segments[i - 1][0];
+                    codon = prevSeg0.slice(prevSeg0.length - 2) + seg[0];
+                } else if (sLen === 2) {
+                    const prevSeg0 = segments[i - 1][0];
+                    codon = prevSeg0.slice(prevSeg0.length - 1) + seg[0];
+                } else {
+                    codon = seg[0];
+                }
+                codon = direction === eDir ? codon : revcomp(codon);
+                const aa = codonTableForward[codon];
+                const color = segSel[i] ? aminoAcidColors[aa] : darkAminoAcidColors[aa];
+                anns = [...anns, {
+                    name: `${dispSeg}_${aa}${i}`,
+                    start: annStart,
+                    end: annEnd,
+                    direction: 0,
+                    color: color
+                }]
+            }
+            setSegAnns(anns);
+        } else {
+            setSegAnns([]);
+        }
+    }, [dispSeg, segInfo, editedData.cdsList]);
 
     const onSubmit = (_) => {
         const minState = {
@@ -826,7 +915,7 @@ const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
             columnGap={tokens.space.medium.value}
             padding="20px"
             width="100%"
-            templateColumns="1fr 800px 1fr"
+            templateColumns="1fr 1000px 1fr"
         >
             <Card columnStart="1" columnEnd="-1" padding="0px">
                 <Heading level={2} children={state.projName} />
@@ -835,13 +924,21 @@ const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
                 <Heading children={`${state.uneditedData.name}`} />
                 <SeqVizWithCDS seqData={{ ...state.uneditedData,
                                           annotations: protoAnns }}
-                                          selHandler={selHandler} />
+                               selHandler={protoHandler} />
                 <Heading children={`${state.editedData.name}`} />
-                <SeqVizWithCDS seqData={state.editedData} />
+                <SeqVizWithCDS seqData={{ ...state.editedData,
+                                          annotations: segAnns }}
+                               selHandler={segHandler} />
                 <SwitchField
                     label="Use PAM variants"
                     labelPosition="start"
                     onChange={(e) => { setUseVars(e.target.checked); }}
+                />
+                <SwitchField
+                    label="Use silent edits"
+                    labelPosition="start"
+                    isChecked={useSilents}
+                    onChange={(e) => { setUseSilents(e.target.checked); }}
                 />
             </Card>
             <Card column="2">
@@ -852,18 +949,33 @@ const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
                             <TableCell as="th">Protospacer</TableCell>
                             <TableCell as="th">Adj. RS3 score</TableCell>
                             <TableCell as="th">Num. edit combos</TableCell>
+                            <TableCell as="th">Tokens required</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {protos.filter(x => selected[x.id])
-                               .map(x => (
-                                   <TableRow>
-                                       <TableCell>{x.id}</TableCell>
-                                       <TableCell>{x.proto30.slice(4, 24)}</TableCell>
-                                       <TableCell>{x.score}</TableCell>
-                                       <TableCell>{x.segments.reduce((acc, val) => acc * val.length, 1)}</TableCell>
-                                   </TableRow>
-                               ))}
+                        {protos
+                         .filter(x => selected[x.id])
+                         .map(x => {
+                             const numCombos = x.segments
+                                               .map((seg, i) => segInfo[x.id].segSel[i]
+                                                                ? seg.length
+                                                                : 1)
+                                               .reduce((acc, x) => acc * x, 1);
+                             let tokenCost = 1;
+                             let combosRem = numCombos === 1 ? 0 : numCombos;
+                             tokenCost = tokenCost + Math.ceil(Math.min(combosRem, 256) / 64);
+                             combosRem = combosRem - Math.min(combosRem, 256);
+                             tokenCost = tokenCost + Math.ceil(combosRem / 256);
+                             return (
+                                 <TableRow>
+                                     <TableCell>{x.id}</TableCell>
+                                     <TableCell>{x.proto30.slice(4, 24)}</TableCell>
+                                     <TableCell>{x.score}</TableCell>
+                                     <TableCell>{numCombos}</TableCell>
+                                     <TableCell>{tokenCost}</TableCell>
+                                 </TableRow>)
+                             }
+                         )}
                     </TableBody>
                 </Table>
             </Card>
