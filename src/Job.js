@@ -5,7 +5,7 @@ import {
 } from "@aws-amplify/ui-react";
 
 import ErrorBoundary from "./Error";
-import { fetchAuth, suspensePromiseWrapper, revcomp, downloadBinary } from "./Utils";
+import { fetchAuth, suspensePromiseWrapper, revcomp, downloadBinary, minEdit } from "./Utils";
 import { SeqVizWithCDS, editHighlights } from "./ModdedSeqViz"
 
 
@@ -40,24 +40,49 @@ const JobComponent = () => {
     const { tokens } = useTheme();
     const { jid } = useParams();
     const jobDataResource = useJobDataResource(jid);
-    const [jobData, setJobData] = useState(jobDataResource.read());  // Blocks until data is ready
+    const jobData = jobDataResource.read();  // Blocks until data is ready
+    const [dispData, setDispData] = useState(jobData);
     const [protoAnns, setProtoAnns] = useState([]);
     const [summary, setSummary] = useState({});
     const ref = useRef(null);
 
-    const sjMap = Object.fromEntries(jobData.subJobData
-                  .map((sj, i) => [jobData.subJobIDs[i], sj]));
-    const nameMap = Object.fromEntries(jobData.subJobData
-                   .map((sj, i) => {
-                       let name = sj.name.split("_");
-                       name = name[name.length - 1];
-                       const sID = jobData.subJobIDs[i];
-                       return [name, sID];
-                   }));
-
+    // FOR DEBUGGING
+    useEffect(() => {
+        let upperState = jobData
+        upperState.uneditedData.seq = jobData.uneditedData.seq.toUpperCase();
+        upperState.editedData.seq = jobData.editedData.seq.toUpperCase();
+        const {minU, minE, preLen} = minEdit(upperState.uneditedData.seq, upperState.editedData.seq);
+        window.printState = () => {
+            console.log(JSON.stringify(JSON.stringify(upperState)));
+        };
+        window.printPridict = () => {
+            const uSeq = upperState.uneditedData.seq;
+            const preSeq = uSeq.slice(preLen - 100, preLen);
+            const postSeq = uSeq.slice(preLen + minU.length, preLen + minU.length + 100);
+            const u = minU.length === 0 ? "+" : minU;
+            const e = minE.length === 0 ? "-" : minE;
+            console.log(`${preSeq}(${u}/${e})${postSeq}`);
+        };
+        window.printDeepPrime = () => {
+            const uSeq = upperState.uneditedData.seq;
+            const eSeq = upperState.editedData.seq;
+            console.log(uSeq.slice(preLen - 60, preLen + 61));
+            console.log(eSeq.slice(preLen - 60, preLen + 61));
+        };
+        window.getStateObject = () => upperState;
+    }, [jobData]);
 
     // Set protospacer annotations
     useEffect(() => {
+        const sjMap = Object.fromEntries(jobData.subJobData
+                  .map((sj, i) => [jobData.subJobIDs[i], sj]));
+        const nameMap = Object.fromEntries(jobData.subJobData
+                        .map((sj, i) => {
+                            let name = sj.name.split("_");
+                            name = name[name.length - 1];
+                            const sID = jobData.subJobIDs[i];
+                            return [name, sID];
+                        }));
         setProtoAnns(
             Object.keys(nameMap)
             .map(name => {
@@ -89,11 +114,11 @@ const JobComponent = () => {
                 return { name, color, start, end, direction };
             })
         );
-    }, [nameMap, sjMap, summary, jobData.uneditedData.seq]);
+    }, [jobData, summary]);
 
     // Get summary
     useEffect(() => {
-        fetchAuth("id_token", "https://api.optipri.me/summary/c132b9ee35")
+        fetchAuth("id_token", `https://api.optipri.me/summary/${jid}`)
         .then(resp => {
             if (!resp.ok) {
                 throw new Error(resp.statusCode);
@@ -111,15 +136,23 @@ const JobComponent = () => {
 
                            })
                        ));
-        });
+        })
+        .catch(err => {});  // Ignore errors
     }, [jid]);
 
     // Add highlights
-    useEffect(() => editHighlights(ref, jobData, setJobData),
-              [ref, jobData.uneditedData.seq, jobData.editedData.seq]);  // eslint-disable-line
+    useEffect(() => editHighlights(ref, dispData, setDispData),
+              [ref, dispData.uneditedData.seq, dispData.editedData.seq]);  // eslint-disable-line
 
     // Custom selection handler for protospacers
     const psHandler = (event) => {
+        const nameMap = Object.fromEntries(jobData.subJobData
+                        .map((sj, i) => {
+                            let name = sj.name.split("_");
+                            name = name[name.length - 1];
+                            const sID = jobData.subJobIDs[i];
+                            return [name, sID];
+                        }));
         if ((event.type === "ANNOTATION") && (event.name in nameMap)) {
             const sID = nameMap[event.name];
             if (sID in summary) {
@@ -142,11 +175,11 @@ const JobComponent = () => {
             <Card columnStart="1" columnEnd="-1">
                 <div ref={ref}>
                     <Heading children={`Unedited sequence: ${jobData.uneditedData.name}`} />
-                    <SeqVizWithCDS seqData={{ ...jobData.uneditedData, annotations: protoAnns }}
+                    <SeqVizWithCDS seqData={{ ...dispData.uneditedData, annotations: protoAnns }}
                                    selHandler={psHandler} />
                 </div>
                 <Heading children={`Edited sequence: ${jobData.editedData.name}`} />
-                <SeqVizWithCDS seqData={jobData.editedData} />
+                <SeqVizWithCDS seqData={dispData.editedData} />
             </Card>
             <Card>
                 <Button
