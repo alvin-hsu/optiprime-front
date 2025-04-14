@@ -39,7 +39,7 @@ import {
 } from "./Utils";
 import ClinvarAutocomplete from "./ClinvarAutocomplete";
 import { EditableSeqViz, SeqVizWithCDS, editHighlights } from "./ModdedSeqViz";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const _CONTEXT_LEN = 110;
 
@@ -618,7 +618,7 @@ const DesignPage = ({ state, setState, onNext }) => {
     );
 };
 
-const PreviewPage = ({ state, setState, onBack }) => {
+const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
     const {tokens} = useTheme();
     const navigate = useNavigate();
     // Extract state
@@ -798,7 +798,6 @@ const PreviewPage = ({ state, setState, onBack }) => {
                                edit_segments: x.segments
                            }))
         };
-        console.log(minState);
         fetchAuth("ac_token", "https://api.optipri.me/jobs", {
             method: "PUT",
             headers: {"Content-Type": "application/json"},
@@ -812,6 +811,7 @@ const PreviewPage = ({ state, setState, onBack }) => {
             }
         })
         .then(body => {
+            updateTokens();
             navigate(`/jobs/${body.jobID}`);
         })
         .catch(e => {
@@ -894,9 +894,10 @@ const PreviewPage = ({ state, setState, onBack }) => {
     );
 };
 
-const Design = () => {
+const Design = ({ updateTokens }) => {
+    const location = useLocation();
     const [view, setView] = useState("design");  // "design" or "preview"
-    const initialState = {
+    const initialState = location.state || {
         projName: "",
         organism: "",
         cvID: "",
@@ -912,7 +913,8 @@ const Design = () => {
             name: "", seq: "", selection: {clockwise: true, start: 0, end: 0},
             cdsList: [], annotations: [], translations: [], highlights: []
         },
-        manual: false
+        manual: false,
+        existingSubJobs: []
     };
     const [state, setState] = useState(initialState);
 
@@ -948,7 +950,11 @@ const Design = () => {
                 <DesignPage state={state} setState={setState} onNext={() => setView("preview")} />
             )}
             {view === "preview" && (
-                <PreviewPage state={state} setState={setState} onBack={() => setView("design")} />
+                <PreviewPage
+                    state={state}
+                    setState={setState}
+                    updateTokens={updateTokens}
+                    onBack={() => setView("design")} />
             )}
         </div>
     )

@@ -1,5 +1,5 @@
 import React, { Suspense, useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
     Button, Card, Grid, Heading, useTheme
 } from "@aws-amplify/ui-react";
@@ -44,6 +44,7 @@ const JobComponent = () => {
     const [dispData, setDispData] = useState(jobData);
     const [protoAnns, setProtoAnns] = useState([]);
     const [summary, setSummary] = useState({});
+    const navigate = useNavigate();
     const ref = useRef(null);
 
     // FOR DEBUGGING
@@ -181,10 +182,10 @@ const JobComponent = () => {
                 <Heading children={`Edited sequence: ${jobData.editedData.name}`} />
                 <SeqVizWithCDS seqData={dispData.editedData} />
             </Card>
-            <Card>
+            <Card columnStart="1" columnEnd="-1">
                 <Button
                     style={{
-                        width: "150px",
+                        width: "200px",
                         height: "30px",
                     }}
                     onClick={() => {
@@ -196,7 +197,7 @@ const JobComponent = () => {
                 </Button>
                 <Button
                     style={{
-                        width: "150px",
+                        width: "200px",
                         height: "30px",
                     }}
                     onClick={() => {
@@ -208,7 +209,7 @@ const JobComponent = () => {
                 </Button>
                 <Button
                     style={{
-                        width: "150px",
+                        width: "200px",
                         height: "30px",
                     }}
                     onClick={() => {
@@ -217,6 +218,30 @@ const JobComponent = () => {
                     }}
                 >
                     Edit mapping
+                </Button>
+                <Button
+                    style={{
+                        width: "200px",
+                        height: "30px",
+                    }}
+                    onClick={() => {
+                        const state = {
+                            projName: jobData.name,
+                            organism: "",
+                            cvID: "",
+                            rsID: "",
+                            assembly: "",
+                            chrCoords: "",
+                            taxId: "",
+                            uneditedData: jobData.uneditedData,
+                            editedData: jobData.editedData,
+                            manual: true,
+                            existingSubJobs: []  /* FIXME */
+                        };
+                        navigate("/design", { state })
+                    }}
+                >
+                    Clone to new job
                 </Button>
             </Card>
         </Grid>
