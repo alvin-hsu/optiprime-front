@@ -265,7 +265,7 @@ const App = () => {
                     <Route path="/other" element={<OtherLinks />}/>
                     <Route path="/idpresponse" element={<IDPResponse updateUserData={updateUserData}/>} />
                     {/* Protected routes */}
-                    <Route path="/design" element={<ProtectedRoute><Design /></ProtectedRoute>} />
+                    <Route path="/design" element={<ProtectedRoute><Design updateTokens={updateTokens} /></ProtectedRoute>} />
                     <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
                     <Route path="/jobs/:jid" element={<ProtectedRoute><Job /></ProtectedRoute>} />
                     {/* Debugging/scratch pages */}
