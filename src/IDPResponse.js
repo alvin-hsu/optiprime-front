@@ -15,7 +15,7 @@ import { decodeToken } from "react-jwt";
  * OptiPrimeAPI -> Authorizers -> Optiprime-authorizer -> Token Source
  * 
  */
-const IDPResponse = () => {
+const IDPResponse = ({ updateUserData }) => {
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -53,7 +53,8 @@ const IDPResponse = () => {
                                       expires: expTime });
         }
         navigate(redirectUrl, { replace: true });
-    }, [navigate]);
+        updateUserData();
+    }, [navigate, updateUserData]);
 
     return <div>Loading...</div>;
 };

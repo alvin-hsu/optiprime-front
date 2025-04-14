@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { BrowserRouter as Router,
          Routes,
          Route,
@@ -8,7 +8,7 @@ import Cookies from "js-cookie";
 import { decodeToken } from "react-jwt";
 import GoogleButton from "react-google-button";
 import MediaQuery from "react-responsive";
-import { IoLogOutOutline } from "react-icons/io5";
+import { IoLogOutOutline, IoSync } from "react-icons/io5";
 import { Button, Image, View, Text } from "@aws-amplify/ui-react"
 import "@aws-amplify/ui-react/styles.css";
 
@@ -94,16 +94,12 @@ const ProtectedRoute = ({ children }) => {
     return children;
 };
 
-const Header = () => {
-    const [isNavVisible, setIsNavVisible] = useState(false);
-    const navigate = useNavigate();
-    const location = useLocation();
-
+const Header = ({ navigate, location, userData, updateTokens }) => {
     const BUTTONS = [{ link: "/design", text: "design" },
                      { link: "/jobs", text: "my jobs" },
                      { link: "/about", text: "about" },
                      { link: "/other", text: "other links" }];
-    const idToken = Cookies.get("id_token");
+    const [isNavVisible, setIsNavVisible] = useState(false);
 
     // User login and logout
     const initiateLogin = () => {
@@ -132,22 +128,35 @@ const Header = () => {
     };
 
     const LogInOutButton = () => {
-        if (!idToken) {
+        if (!("sub" in userData)) {
             return <GoogleButton onClick={initiateLogin} />;
         } else {
-            const email = decodeToken(idToken)["email"];
+            const email = userData["email"];
+            const tokenLimit = "tokensRemaining" in userData ? userData["tokensRemaining"] : userData["tokenLimit"];
             return (
                 <View fontSize="16px" textAlign="right">
                     <Text children={`Logged in as ${email}`}/>
+                    <Text children={`Tokens remaining: ${tokenLimit}`}/>
+                    <Button onClick={updateTokens}
+                            fontWeight="normal"
+                            fontSize="16px"
+                            padding="1px 10px 1px"
+                            margin="1px 1px">
+                        Refresh token count
+                        <View>
+                            <IoSync size="2em" />
+                        </View>
+                    </Button>
                     <Button onClick={initiateLogout}
                             fontWeight="normal"
                             fontSize="16px"
-                            padding="1px 1px"
+                            padding="1px 10px 1px"
                             margin="1px 1px">
+                        Logout
                         <View>
                             <IoLogOutOutline size="2em"/>
                         </View>
-                    </Button> {/* DC TODO: Add "Logout" text to left of button and center nicely */}
+                    </Button>
                 </View>
             )
         }
@@ -210,11 +219,41 @@ const Header = () => {
 };
 
 const App = () => {
+    const navigate = useNavigate();
     const location = useLocation();
+    const [userData, setUserData] = useState({});
+    const updateUserData = () => {
+        const idToken = Cookies.get("id_token");
+        const data = idToken ? decodeToken(idToken) : {};
+        setUserData(data);
+        return data;
+    };
+    const updateTokens = () => {
+        fetchAuth("ac_token", "https://api.optipri.me/token_usage")
+        .then(resp => {
+            if (!resp.ok) {
+                throw new Error("Failed to get token usage")
+            }
+            return resp.json()
+        })
+        .then(data => {
+            setUserData(oldData => ({
+                ...oldData,
+                "tokensRemaining": oldData["tokenLimit"] - data.usage.reduce((a, x) => a + x, 0)
+            }));
+        })
+        .catch(_ => {});
+    };
+    useEffect(() => {
+        const idToken = updateUserData();
+        if (idToken) {
+            updateTokens();
+        }
+    }, []);
 
     return (
         <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-            <Header />
+            <Header navigate={navigate} location={location} userData={userData} updateTokens={updateTokens} />
             <View display="flex" overflow="scroll"
                   style={{ justifyContent: "center", height: "85vh" }}>
                 <Routes location={location}>
@@ -224,11 +263,11 @@ const App = () => {
                     <Route path="/rest" element={<REST />} />
                     <Route path="/about" element={<About />} />
                     <Route path="/other" element={<OtherLinks />}/>
-                    <Route path="/idpresponse" element={<IDPResponse />} />
+                    <Route path="/idpresponse" element={<IDPResponse updateUserData={updateUserData}/>} />
                     {/* Protected routes */}
                     <Route path="/design" element={<ProtectedRoute><Design /></ProtectedRoute>} />
                     <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
-                    <Route path="/jobs/:jid" element={<ProtectedRoute><Job /></ProtectedRoute>}></Route>
+                    <Route path="/jobs/:jid" element={<ProtectedRoute><Job /></ProtectedRoute>} />
                     {/* Debugging/scratch pages */}
                     <Route path="/seqviz" element={<SeqVizTest />} />
                     <Route path="/scratch" element={<Scratch />} />
