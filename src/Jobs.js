@@ -24,7 +24,8 @@ const Jobs = () => {
                     .toSorted((a, b) => (a.submitTime.S < b.submitTime.S ? 1 : -1))
                     .map(x => ({ id: x.jobID.S,
                                  name: x.name.S,
-                                 status: x.status.S
+                                 status: x.status.S,
+                                 submitTime: x.submitTime.S
                         })
                     )
                 );
@@ -32,26 +33,32 @@ const Jobs = () => {
         })
     }, []);
 
-    // DC TODO: Fix styling to make table rows constant height
     return (
-        <Table highlightOnHover={true}>
-            <TableHead borderWidth="1px" borderColor="black" height="20px">
-                <TableRow height="20px">
-                    <TableCell as="th">Job ID</TableCell>
-                    <TableCell as="th">Job Name</TableCell>
-                    <TableCell as="th">Status</TableCell>
-                </TableRow>
-            </TableHead>
-            <TableBody>
-            {jobs.map(j =>
-                <TableRow height="20px" onClick={() => navigate(`${j.id}`)}>
-                    <TableCell>{j.id}</TableCell>
-                    <TableCell>{j.name}</TableCell>
-                    <TableCell>{j.status}</TableCell>
-                </TableRow>
-            )}
-            </TableBody>
-        </Table>
+        <div>
+            <Table
+                highlightOnHover={true}
+                style={{ tableLayout: "fixed" }}
+            >
+                <TableHead borderWidth="1px" borderColor="black" height="10px">
+                    <TableRow height="10px" padding="5px">
+                        <TableCell as="th" style={{ width: "200px" }}>Job ID</TableCell>
+                        <TableCell as="th">Job name</TableCell>
+                        <TableCell as="th" style={{ width: "100px" }}>Status</TableCell>
+                        <TableCell as="th" style={{ width: "600px" }}>Submitted at</TableCell>
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                {jobs.map(j =>
+                    <TableRow height="20px" onClick={() => navigate(`${j.id}`)}>
+                        <TableCell>{j.id}</TableCell>
+                        <TableCell>{j.name}</TableCell>
+                        <TableCell>{j.status}</TableCell>
+                        <TableCell>{new Date(j.submitTime).toString()}</TableCell>
+                    </TableRow>
+                )}
+                </TableBody>
+            </Table>
+        </div>
     );
 };
 
