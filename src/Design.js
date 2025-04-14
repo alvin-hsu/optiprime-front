@@ -704,6 +704,9 @@ const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
         // Get Doench score
         const scoreCache = JSON.parse(localStorage.getItem("protoScores")) || {};
         const proto30s = protoPams.map(x => x.proto30);
+        if (protoPams.filter(x => x.pamVar === "SpNGG").length === 0) {
+            setUseVars(true);
+        }
         const nonCached = proto30s.filter(x => !(x in scoreCache));
         if (nonCached.length > 0) {
             setInfo("Evaluating protospacers with Doench Rule Set 3...");
@@ -932,6 +935,7 @@ const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
                 <SwitchField
                     label="Use PAM variants"
                     labelPosition="start"
+                    isChecked={useVars}
                     onChange={(e) => { setUseVars(e.target.checked); }}
                 />
                 <SwitchField
@@ -999,6 +1003,7 @@ const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
                         type="submit"
                         variation="primary"
                         onClick={onSubmit}
+                        disabled={protos.filter(x => selected[x.id]).length === 0}
                     />
                 </Flex>
             </Flex>
