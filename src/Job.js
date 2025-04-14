@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-    Button, Card, Grid, Heading, useTheme
+    Button, Card, Flex, Grid, Heading, useTheme
 } from "@aws-amplify/ui-react";
 
 import ErrorBoundary from "./Error";
@@ -138,7 +138,7 @@ const JobComponent = () => {
                            })
                        ));
         })
-        .catch(err => {});  // Ignore errors
+        .catch(_ => {});  // Ignore errors
     }, [jid]);
 
     // Add highlights
@@ -154,8 +154,9 @@ const JobComponent = () => {
                             const sID = jobData.subJobIDs[i];
                             return [name, sID];
                         }));
-        if ((event.type === "ANNOTATION") && (event.name in nameMap)) {
-            const sID = nameMap[event.name];
+        const name = event.name.split(" ")[0];
+        if ((event.type === "ANNOTATION") && (name in nameMap)) {
+            const sID = nameMap[name];
             if (sID in summary) {
                 console.log(summary[sID]);
             }
@@ -168,21 +169,18 @@ const JobComponent = () => {
             columnGap={tokens.space.medium.value}
             padding="20px"
             width="95%"
-            templateColumns="1fr 800px 1fr"
+            templateColumns="1fr 1000px 1fr"
+            style={{ height: "auto" }}
         >
             <Card columnStart="1" columnEnd="-1" padding="0px" height="100px">
                 <Heading level={2} children={jobData.name} />
             </Card>
-            <Card columnStart="1" columnEnd="-1">
-                <div ref={ref}>
-                    <Heading children={`Unedited sequence: ${jobData.uneditedData.name}`} />
-                    <SeqVizWithCDS seqData={{ ...dispData.uneditedData, annotations: protoAnns }}
-                                   selHandler={psHandler} />
-                </div>
-                <Heading children={`Edited sequence: ${jobData.editedData.name}`} />
-                <SeqVizWithCDS seqData={dispData.editedData} />
-            </Card>
-            <Card columnStart="1" columnEnd="-1">
+            <Card column="2" style={{
+                justifyContent: "center",
+                alignContent: "center",
+                display: "flex",
+                height: "80px"
+            }}>
                 <Button
                     style={{
                         width: "200px",
@@ -244,6 +242,17 @@ const JobComponent = () => {
                     Clone to new job
                 </Button>
             </Card>
+            <Card columnStart="1" columnEnd="-1">
+                <div ref={ref}>
+                    <Heading children={`Unedited sequence: ${jobData.uneditedData.name}`} />
+                    <SeqVizWithCDS seqData={{ ...dispData.uneditedData, annotations: protoAnns }}
+                                   selHandler={psHandler} />
+                </div>
+                <Heading children={`Edited sequence: ${jobData.editedData.name}`} />
+                <SeqVizWithCDS seqData={dispData.editedData} />
+            </Card>
+            <Flex justifyContent="space-between">
+            </Flex>
         </Grid>
     );
 };
