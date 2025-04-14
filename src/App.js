@@ -237,9 +237,12 @@ const App = () => {
             return resp.json()
         })
         .then(data => {
+            const totalUsage = data.usage.reduce((a, x) => a + x, 0);
             setUserData(oldData => ({
                 ...oldData,
-                "tokensRemaining": oldData["tokenLimit"] - data.usage.reduce((a, x) => a + x, 0)
+                "tokensRemaining": "tokenLimit" in oldData
+                                   ? oldData["tokenLimit"] - totalUsage
+                                   : 100 - totalUsage
             }));
         })
         .catch(_ => {});
