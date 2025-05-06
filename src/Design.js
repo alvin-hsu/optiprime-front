@@ -124,18 +124,18 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
         cvIDtoHg38Coords(cvID)
         .then(async x => {
             const { coords, alleles } = x;
-            const { minU, minE, eName } = alleles;
+            const { ref, mut, vName } = alleles;
             pushInfo("human", "Fetching reference sequence...");
             const seq = await fetchSequenceFromCoords(coords, _CONTEXT_LEN);
-            const uLen = minU.length;
-            const eSeq = seq.substring(0, _CONTEXT_LEN) + minE + seq.substring(_CONTEXT_LEN + uLen);
+            const rLen = ref.length;
+            const uSeq = seq.substring(0, _CONTEXT_LEN) + mut + seq.substring(_CONTEXT_LEN + rLen);
             setState(s => ({ ...s,
                              uneditedData: { ...s.uneditedData,
-                                             name: `${x.gene} (ref)`,
-                                             seq: seq },
+                                             name: vName,
+                                             seq: uSeq },
                              editedData: { ...s.editedData,
-                                           name: eName,
-                                           seq: eSeq } }));
+                                           name: `${x.gene} (ref)`,
+                                           seq: seq } }));
             return { ...x, seq };
         })
         .then(async x => {
@@ -148,9 +148,9 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
             popInfo("human");
             popError("human");
             const { alleles, coords, refSeq } = x;
-            const { minU, minE } = alleles;
-            const uLen = minU.length;
-            const eLen = minE.length;
+            const { ref, mut } = alleles;
+            const uLen = mut.length;
+            const eLen = ref.length;
             const uCdsList = getContextExonTranslations(refSeq, coords.pos, _CONTEXT_LEN);
             const eCdsList = uCdsList.map(cds => updateCDS(cds,
                                                            { start: _CONTEXT_LEN,
@@ -289,7 +289,13 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
     return (
         <Card column="2">
             <Heading children="Search ClinVar for gene variants:" />
-            <ClinvarAutocomplete setCvData={setCvData} submitCvID={submitCvID} />
+            <Flex justifyContent="flex-start" alignItems="baseline" padding="5px">
+                <ClinvarAutocomplete setCvData={setCvData} submitCvID={submitCvID} />
+                <Button children="ClinVar serach"
+                        onClick={_ => {submitCvID(cvData.item_code);}}
+                        disabled={!/\d+/.test(cvData.item_code)}
+                        height="42px" />
+            </Flex>
             <Divider label="or" margin="10px" />
             <Heading children="Search dbSNP by rsID:" />
             <Flex justifyContent="flex-start" alignItems="baseline" padding="5px">

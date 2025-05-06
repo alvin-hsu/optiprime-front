@@ -52,15 +52,15 @@ export const cvIDtoHg38Coords = (cvID) => {
                }
                const varData = data["result"][cvID]["variation_set"][0];
                const spdi = varData["canonical_spdi"];
-               const [start, unedited, edited] = spdi.split(":").slice(1);
+               const [start, ref, mut] = spdi.split(":").slice(1);
                const coord = varData["variation_loc"].filter(x => (x["status"] === "current"))[0];
                const { chr, assembly_name } = coord;
                return { coords: { assembly: ASM_MAP[assembly_name],
                                   chrom: "chr" + chr,
                                   pos: start },
-                        alleles: { eName: varData["variation_name"],
-                                   minU: unedited,
-                                   minE: edited },
+                        alleles: { vName: varData["variation_name"],
+                                   ref: ref,
+                                   mut: mut },
                         gene: data["result"][cvID]["gene_sort"] };
            });
 };
