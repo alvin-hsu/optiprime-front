@@ -84,9 +84,11 @@ const SeqVizWithCDS = ({ seqData, selHandler }) => {
     );
 };
 
-const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
+const EditableSeqViz = ({ seqData, setSeqData, selHandler, allowIupac }) => {
     // Constants
     const MAX_UNDO_STACK = 64;
+    allowIupac = typeof allowIupac === "undefined" ? false : allowIupac;
+    const BASES = allowIupac ? "ACGTN" : "ACGT";
     // State
     const [editEnabled, setEditEnabled] = useState(false);
     // PASTE FUNCTIONALITY
@@ -165,7 +167,7 @@ const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
         const keypressHandler = (event) => {
             let hasSelection = !isNaN(selection.start);
             let keyUpper = event.key.toUpperCase();
-            let isBase = "ACGT".includes(keyUpper);
+            let isBase = BASES.includes(keyUpper);
             setShowWarn(false);
             if (hasSelection && isBase) {
                 if (!isIns) {  // Set undo stack
@@ -233,7 +235,13 @@ const EditableSeqViz = ({ seqData, setSeqData, selHandler }) => {
             const selection = seqData.selection;
             let clipboardText = event.clipboardData.getData('Text');
             clipboardText = clipboardText.replace(/\s+/g, "")
-            let processedText = clipboardText.toUpperCase().replace(/[^ACGT]+/g, "")
+            let processedText;
+            if (allowIupac) {
+                processedText = clipboardText.toUpperCase().replace(/[^ACGTN]+/g, "");
+            } else {
+                processedText = clipboardText.toUpperCase().replace(/[^ACGT]+/g, "");
+            }
+
             if (clipboardText !== processedText) {
                 setShowWarn(true);
                 setPasteData(clipboardText);

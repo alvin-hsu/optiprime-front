@@ -519,7 +519,8 @@ const Edited = ({ state, setState, pushError, popError }) => {
             <Button onClick={switchSeqs}>{'\u21d5'}</Button>
             <EditableSeqViz isEditable={true}
                             seqData={state.editedData}
-                            setSeqData={setEditedData} />
+                            setSeqData={setEditedData}
+                            allowIupac={true} />
         </Card>
     );
 };

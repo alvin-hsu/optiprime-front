@@ -303,10 +303,12 @@ export const updateCDS = (cds, selection, delta) => {
  * Return the reverse complement of a DNA sequence.
  */
 export const revcomp = (seq) => {
-    const complement = seq.replaceAll("A", "t")
+    const complement = seq.toUpperCase()
+                          .replaceAll("A", "t")
                           .replaceAll("C", "g")
                           .replaceAll("G", "c")
                           .replaceAll("T", "a")
+                          .replaceAll("N", "n")
                           .toUpperCase();
     return complement.split("").reverse().join("");
 };
@@ -320,6 +322,20 @@ export const moveToFront = (a, x) => {
 }
 
 export const splitDNAbyCDS = (dna, cdsList) => {
+    const decodeIupac = (array) => {
+        const IUPAC = {
+            "A": ["A"],
+            "C": ["C"],
+            "G": ["G"],
+            "T": ["T"],
+            "N": ["A", "C", "G", "T"]
+        };
+        if (array.length === 1) {
+            return IUPAC[array[0]];
+        } else {
+            return IUPAC[array[0]].flatMap(x => decodeIupac(array.slice(1)).map(y => x + y));
+        }
+    }
     // Sort CDS segments by start coordinate
     cdsList.sort((a, b) => a.start - b.start);
     let result = [];
@@ -344,7 +360,8 @@ export const splitDNAbyCDS = (dna, cdsList) => {
         // Use a regex to match groups of 1-3 characters.
         let codons = remainder.match(/.{1,3}/g) || [];
         codons = (prefix ? [prefix, ...codons] : codons);
-        codons = codons.map(x => x.length === 3 ? moveToFront(codonTableReverse[codonTableForward[x]], x) : [x]);
+        codons = codons.map(x => x.includes("N") || (x.length !== 3)
+                                 ? [x] : moveToFront(codonTableReverse[codonTableForward[x]], x));
         if (cds.direction === "-") {
             codons = codons.map(x => x.map(revcomp)).toReversed();
         }
@@ -355,6 +372,11 @@ export const splitDNAbyCDS = (dna, cdsList) => {
     if (lastIndex < dna.length) {
         result = [...result, [dna.slice(lastIndex)]];
     }
+    result = result.map(seg => seg.flatMap(x => x.includes("N")
+                                                ? decodeIupac(x.split("").flatMap((y, i) => i < y.length - 1
+                                                                                            ? [y, "N"]
+                                                                                            : [y]))
+                                                : [x]));
     return result;
 }
 
