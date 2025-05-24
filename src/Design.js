@@ -894,7 +894,7 @@ const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
                            .map(x => ({
                                name: `${state.projName}_${x.id}`,
                                unedited: x.unedited,
-                               edit_segments: x.segments
+                               edit_segments: x.segments.map((s, i) => segInfo[x.id].segSel[i] ? s : [s[0]])
                            }))
         };
         fetchAuth("ac_token", "https://api.optipri.me/jobs", {
