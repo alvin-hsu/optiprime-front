@@ -128,14 +128,14 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
             pushInfo("human", "Fetching reference sequence...");
             const seq = await fetchSequenceFromCoords(coords, _CONTEXT_LEN);
             const rLen = ref.length;
-            const uSeq = seq.substring(0, _CONTEXT_LEN) + mut + seq.substring(_CONTEXT_LEN + rLen);
+            const mSeq = seq.substring(0, _CONTEXT_LEN) + mut + seq.substring(_CONTEXT_LEN + rLen);
             setState(s => ({ ...s,
                              uneditedData: { ...s.uneditedData,
-                                             name: vName,
-                                             seq: uSeq },
+                                             name: `${x.gene} (ref)`,
+                                             seq: seq },
                              editedData: { ...s.editedData,
-                                           name: `${x.gene} (ref)`,
-                                           seq: seq } }));
+                                           name: vName,
+                                           seq: mSeq } }));
             return { ...x, seq };
         })
         .then(async x => {
@@ -163,6 +163,9 @@ const Human = ({ state, setState, pushInfo, popInfo, pushError, popError }) => {
                                              cdsList: uCdsList },
                              editedData: { ...s.editedData,
                                            cdsList: eCdsList } }));
+        })
+        .then(() => {
+            setState(s => ({ ...s, uneditedData: s.editedData, editedData: s.uneditedData }));
         })
         .catch(error => {
             popInfo("human");
