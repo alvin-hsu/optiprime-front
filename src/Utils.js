@@ -456,7 +456,7 @@ export const reduceSegments = (segments, offset) => {
             const trimmed = segment.filter(x => x.slice(0, 21 - oldTotal) === prefix)
                                    .map(x => x.slice(21 - oldTotal));
             retval = total === 21 ? [[segment0]] : [[segment0], trimmed];
-        } else if (oldTotal < offset || retval.length < 5) {
+        } else if (oldTotal < offset && retval.length < 8) {
             retval = [...retval, segment];
         } else {
             tail = [...tail, segment[0]];
