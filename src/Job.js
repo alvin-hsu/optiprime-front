@@ -1,7 +1,7 @@
 import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-    Button, Card, Flex, Grid, Heading, TextField, useTheme, Text
+    Button, Card, Flex, Grid, Heading, useTheme, Text
 } from "@aws-amplify/ui-react";
 
 import ErrorBoundary from "./Error";
@@ -310,6 +310,16 @@ function selectDiversePegRNAsRanked(seqs, normalizedScores, k, bias) {
 // Decoding functions for pegRNA sequences
 const MAP_RE = /[A-Z][a-z]*/;
 
+// Helper function to extract spacer name from subJobData
+const getSpacerName = (subJobData, subJobIDs, subJobID) => {
+    const index = subJobIDs.indexOf(subJobID);
+    if (index === -1 || !subJobData[index]) return '';
+    
+    const sj = subJobData[index];
+    const nameParts = sj.name.split('_');
+    return nameParts[nameParts.length - 1]; // Get the last part after the last underscore
+};
+
 // Function to decode a pegRNA name to its full sequence using edit segments
 const decodePegRNAName = (pegRNAName, editSegments) => {
     try {
@@ -391,9 +401,10 @@ const JobComponent = () => {
     const [diverseResults, setDiverseResults] = useState([]);
     const [optiPrimeResults, setOptiPrimeResults] = useState([]);
     const [allCandidateSequences, setAllCandidateSequences] = useState([]);
-    const [showDebug, setShowDebug] = useState(false);
+    const [hasGeneratedComparison, setHasGeneratedComparison] = useState(false);
+    const [showAdvancedControls, setShowAdvancedControls] = useState(false);
     const [diversityBias, setDiversityBias] = useState(0.5); // 0 = pure diversity, 1 = pure score
-    const [biasMethod, setBiasMethod] = useState('weighted'); // 'weighted', 'filtered', 'hybrid'
+    const [biasMethod, setBiasMethod] = useState('ranked'); // 'weighted', 'filtered', 'hybrid', 'ranked'
     const navigate = useNavigate();
     const ref = useRef(null);
 
@@ -602,9 +613,11 @@ const JobComponent = () => {
                     // Decode all pegRNAs for this subJob
                     return summary[id].map(([pegRNAName, score]) => {
                         const fullSequence = decodePegRNAName(pegRNAName, editSegments);
+                        const spacerName = getSpacerName(jobData.subJobData, jobData.subJobIDs, id);
+                        const displayName = spacerName ? `${spacerName}_${pegRNAName}` : pegRNAName;
                         return {
                             id: `${id}_${pegRNAName}`,
-                            name: pegRNAName,
+                            name: displayName,
                             sequence: fullSequence || sj.unedited, // Fallback to unedited if decoding fails
                             score: score
                         };
@@ -660,10 +673,12 @@ const JobComponent = () => {
                         
                         // Decode the full sequence from the pegRNA name
                         const fullSequence = decodePegRNAName(pegRNAName, editSegments);
+                        const spacerName = getSpacerName(jobData.subJobData, jobData.subJobIDs, id);
+                        const displayName = spacerName ? `${spacerName}_${pegRNAName}` : pegRNAName;
                         
                         return {
                             id: `${id}_${pegRNAName}`,
-                            name: pegRNAName,
+                            name: displayName,
                             sequence: fullSequence || sj.unedited, // Fallback to unedited if decoding fails
                             score: score.toFixed(3)
                         };
@@ -676,6 +691,7 @@ const JobComponent = () => {
             console.log("OptiPrime results length:", optiPrimeTop.length);
             setOptiPrimeResults(optiPrimeTop);
             setAllCandidateSequences(allCandidateSequences);
+            setHasGeneratedComparison(true);
         } catch (error) {
             console.error("Error generating pegRNA comparison:", error);
             console.warn("Failed to generate comparison. Please check the console for details.");
@@ -769,64 +785,33 @@ const JobComponent = () => {
                 <Heading level={3} children="pegRNA selection" />
                 <Flex gap="20px" alignItems="center" marginBottom="20px">
                     <Text>Number of pegRNAs to compare:</Text>
-                    <TextField
+                    <input
                         type="number"
                         value={diverseCount}
-                        onChange={e => setDiverseCount(parseInt(e.target.value) || 5)}
+                        onChange={e => {
+                            const value = parseInt(e.target.value);
+                            if (!isNaN(value) && value >= 1) {
+                                setDiverseCount(value);
+                            }
+                        }}
+                        onBlur={e => {
+                            const value = parseInt(e.target.value);
+                            if (isNaN(value) || value < 1) {
+                                setDiverseCount(5);
+                            }
+                        }}
                         min={1}
-                        max={jobData.subJobData?.length || 100}
-                        style={{ width: "100px" }}
+                        step={1}
+                        style={{ 
+                            width: "100px", 
+                            padding: "8px", 
+                            borderRadius: "4px", 
+                            border: "1px solid #ccc",
+                            fontSize: "14px"
+                        }}
                     />
                     <Button onClick={generatePegRNAComparison}>
                         Generate Comparison
-                    </Button>
-                    <Button 
-                        onClick={() => {
-                            console.log("=== DEBUG DATA STRUCTURES ===");
-                            console.log("Summary object:", JSON.stringify(summary, null, 2));
-                            console.log("SubJobData array:", JSON.stringify(jobData.subJobData, null, 2));
-                            console.log("SubJobIDs array:", JSON.stringify(jobData.subJobIDs, null, 2));
-                            console.log("Summary keys:", Object.keys(summary));
-                            console.log("SubJobIDs length:", jobData.subJobIDs.length);
-                            
-                            // Check for matching IDs
-                            const summaryKeys = Object.keys(summary);
-                            const matchingIds = summaryKeys.filter(id => jobData.subJobIDs.includes(id));
-                            console.log("Matching IDs:", matchingIds);
-                            console.log("Matching count:", matchingIds.length);
-                            
-                            // Show all summary entries
-                            console.log("=== ALL SUMMARY ENTRIES ===");
-                            summaryKeys.forEach(key => {
-                                console.log(`Summary entry for ${key}:`, JSON.stringify(summary[key], null, 2));
-                            });
-                            
-                            // Show all subJobData entries
-                            console.log("=== ALL SUBJOB DATA ENTRIES ===");
-                            jobData.subJobData.forEach((sj, index) => {
-                                console.log(`SubJobData[${index}] (ID: ${jobData.subJobIDs[index]}):`, JSON.stringify(sj, null, 2));
-                            });
-                            
-                            if (matchingIds.length > 0) {
-                                const firstMatch = matchingIds[0];
-                                const index = jobData.subJobIDs.indexOf(firstMatch);
-                                console.log("=== FIRST MATCHING ENTRY ===");
-                                console.log("First matching ID:", firstMatch);
-                                console.log("Index in subJobIDs:", index);
-                                console.log("SubJobData at index:", JSON.stringify(jobData.subJobData[index], null, 2));
-                                console.log("Summary data for ID:", JSON.stringify(summary[firstMatch], null, 2));
-                            } else {
-                                console.log("=== NO MATCHING IDS FOUND ===");
-                                console.log("This is why OptiPrime results aren't showing!");
-                            }
-                        }}
-                    >
-                        Debug Data
-                    </Button>
-                    <Button 
-                        onClick={() => setShowDebug(!showDebug)}
-                    >
-                        {showDebug ? "Hide Debug" : "Show Debug"}
                     </Button>
                     <Button 
                         onClick={() => {
@@ -863,207 +848,209 @@ const JobComponent = () => {
                     )}
                 </Flex>
                 
-                {/* Diversity Bias Controls */}
-                <Card padding="15px" marginBottom="20px" backgroundColor="#f8f9fa">
-                    <Heading level={4} children="Diversity Bias Controls" />
-                    <Grid templateColumns="1fr 1fr" gap="20px">
-                        <Flex direction="column" gap="10px">
-                            <Text>Diversity vs Score Bias: {diversityBias.toFixed(2)}</Text>
+                {/* Advanced Controls Checkbox - Only show after first generation */}
+                {hasGeneratedComparison && (
+                    <Card padding="15px" marginBottom="20px" backgroundColor="#f8f9fa">
+                        <Flex alignItems="center" gap="10px">
                             <input
-                                type="range"
-                                min="0"
-                                max="1"
-                                step="0.01"
-                                value={diversityBias}
-                                onChange={e => setDiversityBias(parseFloat(e.target.value))}
-                                style={{ width: "100%" }}
+                                type="checkbox"
+                                id="advancedControls"
+                                checked={showAdvancedControls}
+                                onChange={e => setShowAdvancedControls(e.target.checked)}
+                                style={{ width: "16px", height: "16px" }}
                             />
-                            <Flex justifyContent="space-between">
-                                <Text fontSize="12px">Pure Diversity</Text>
-                                <Text fontSize="12px">Pure Score</Text>
-                            </Flex>
-                        </Flex>
-                        <Flex direction="column" gap="10px">
-                            <Text>Bias Method:</Text>
-                            <select
-                                value={biasMethod}
-                                onChange={e => setBiasMethod(e.target.value)}
-                                style={{ padding: "5px", borderRadius: "4px" }}
-                            >
-                                <option value="weighted">Weighted Distance</option>
-                                <option value="filtered">Score Filtering</option>
-                                <option value="hybrid">Hybrid Selection</option>
-                                <option value="ranked">Ranked Diversity</option>
-                            </select>
-                            <Text fontSize="12px" color="gray">
-                                {biasMethod === 'weighted' && "Combines diversity and score in distance calculation"}
-                                {biasMethod === 'filtered' && "Filters by score threshold, then selects diverse"}
-                                {biasMethod === 'hybrid' && "Alternates between diversity and score selection"}
-                                {biasMethod === 'ranked' && "Ranks by score, then selects diverse from top N"}
+                            <Text as="label" htmlFor="advancedControls" fontWeight="bold">
+                                Advanced Controls
                             </Text>
                         </Flex>
-                    </Grid>
-                </Card>
+                    </Card>
+                )}
+                
+                {/* Diversity Bias Controls - Only show after first generation and when advanced controls are enabled */}
+                {hasGeneratedComparison && showAdvancedControls && (
+                    <Card padding="15px" marginBottom="20px" backgroundColor="#f8f9fa">
+                        <Heading level={4} children="Diversity Bias Controls" />
+                        <Grid templateColumns="1fr 1fr" gap="20px">
+                            <Flex direction="column" gap="10px">
+                                <Text>Diversity vs Score Bias: {diversityBias.toFixed(2)}</Text>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.01"
+                                    value={diversityBias}
+                                    onChange={e => setDiversityBias(parseFloat(e.target.value))}
+                                    style={{ width: "100%" }}
+                                />
+                                <Flex justifyContent="space-between">
+                                    <Text fontSize="12px">Pure Diversity</Text>
+                                    <Text fontSize="12px">Pure Score</Text>
+                                </Flex>
+                            </Flex>
+                            <Flex direction="column" gap="10px">
+                                <Text>Bias Method:</Text>
+                                <select
+                                    value={biasMethod}
+                                    onChange={e => setBiasMethod(e.target.value)}
+                                    style={{ padding: "5px", borderRadius: "4px" }}
+                                >
+                                    <option value="weighted">Weighted Distance</option>
+                                    <option value="filtered">Score Filtering</option>
+                                    <option value="hybrid">Hybrid Selection</option>
+                                    <option value="ranked">Ranked Diversity</option>
+                                </select>
+                                <Text fontSize="12px" color="gray">
+                                    {biasMethod === 'weighted' && "Combines diversity and score in distance calculation"}
+                                    {biasMethod === 'filtered' && "Filters by score threshold, then selects diverse"}
+                                    {biasMethod === 'hybrid' && "Alternates between diversity and score selection"}
+                                    {biasMethod === 'ranked' && "Ranks by score, then selects diverse from top N"}
+                                </Text>
+                            </Flex>
+                        </Grid>
+                    </Card>
+                )}
                 
                 {(diverseResults.length > 0 || optiPrimeResults.length > 0) && (
-                    <Grid templateColumns="1fr 1fr" gap="20px">
-                        {/* Diverse PegRNAs */}
-                        <Card padding="15px">
-                            <Heading level={4} children="Diverse pegRNAs" />
-                            <Text fontSize="14px" color="gray" marginBottom="10px">
-                                Most diverse selection based on sequence similarity, Shannon entropy, and transition/transversion penalty
-                            </Text>
-                            {diverseResults.length > 0 ? (
-                                <>
-                                    {diverseResults.map((pegRNA, index) => {
-                                        // Find the corresponding candidate to get the score
+                    <>
+                        {/* Statistics Section - Above the columns */}
+                        <Grid templateColumns="1fr 1fr" gap="20px" marginBottom="20px">
+                            {/* Diverse PegRNAs Statistics */}
+                            <Card padding="15px" backgroundColor="#e3f2fd">
+                                <Heading level={4} children="Diverse PegRNAs Statistics" />
+                                {(() => {
+                                    const scores = diverseResults.map(pegRNA => {
                                         // eslint-disable-next-line no-undef
                                         const candidate = allCandidateSequences.find(c => c.id === pegRNA.id);
-                                        const score = candidate ? candidate.score.toFixed(3) : "N/A";
-                                        
-                                        return (
+                                        return candidate ? candidate.score : null;
+                                    }).filter(score => score !== null);
+                                    
+                                    if (scores.length === 0) {
+                                        return <Text color="gray">No scores available</Text>;
+                                    }
+                                    
+                                    const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+                                    const variance = scores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / scores.length;
+                                    const stdDev = Math.sqrt(variance);
+                                    
+                                    return (
+                                        <Flex direction="column" gap="5px">
+                                            <Text>Mean OptiPrime Score: <span style={{ fontWeight: 'bold' }}>{mean.toFixed(3)}</span></Text>
+                                            <Text>Standard Deviation: <span style={{ fontWeight: 'bold' }}>{stdDev.toFixed(3)}</span></Text>
+                                            <Text>Score Range: <span style={{ fontWeight: 'bold' }}>{Math.min(...scores).toFixed(3)} - {Math.max(...scores).toFixed(3)}</span></Text>
+                                            <Text>Total PegRNAs: <span style={{ fontWeight: 'bold' }}>{diverseResults.length}</span></Text>
+                                        </Flex>
+                                    );
+                                })()}
+                            </Card>
+                            
+                            {/* OptiPrime Results Statistics */}
+                            <Card padding="15px" backgroundColor="#e8f5e8">
+                                <Heading level={4} children="OptiPrime Results Statistics" />
+                                {(() => {
+                                    const scores = optiPrimeResults.map(pegRNA => parseFloat(pegRNA.score));
+                                    
+                                    if (scores.length === 0) {
+                                        return <Text color="gray">No scores available</Text>;
+                                    }
+                                    
+                                    const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+                                    const variance = scores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / scores.length;
+                                    const stdDev = Math.sqrt(variance);
+                                    
+                                    return (
+                                        <Flex direction="column" gap="5px">
+                                            <Text>Mean OptiPrime Score: <span style={{ fontWeight: 'bold' }}>{mean.toFixed(3)}</span></Text>
+                                            <Text>Standard Deviation: <span style={{ fontWeight: 'bold' }}>{stdDev.toFixed(3)}</span></Text>
+                                            <Text>Score Range: <span style={{ fontWeight: 'bold' }}>{Math.min(...scores).toFixed(3)} - {Math.max(...scores).toFixed(3)}</span></Text>
+                                            <Text>Total PegRNAs: <span style={{ fontWeight: 'bold' }}>{optiPrimeResults.length}</span></Text>
+                                        </Flex>
+                                    );
+                                })()}
+                            </Card>
+                        </Grid>
+                        
+                        {/* PegRNA Results Columns with Scrolling */}
+                        <Grid templateColumns="1fr 1fr" gap="20px">
+                            {/* Diverse PegRNAs */}
+                            <Card padding="15px">
+                                <Heading level={4} children="Diverse pegRNAs" />
+                                <Text fontSize="14px" color="gray" marginBottom="10px">
+                                    Most diverse selection based on sequence similarity, Shannon entropy, and transition/transversion penalty. Biased by OptiPrime score.
+                                </Text>
+                                {diverseResults.length > 0 ? (
+                                    <div style={{ 
+                                        maxHeight: "600px", 
+                                        overflowY: "auto",
+                                        paddingRight: "10px"
+                                    }}>
+                                        {diverseResults.map((pegRNA, index) => {
+                                            // Find the corresponding candidate to get the score
+                                            // eslint-disable-next-line no-undef
+                                            const candidate = allCandidateSequences.find(c => c.id === pegRNA.id);
+                                            const score = candidate ? candidate.score.toFixed(3) : "N/A";
+                                            
+                                            return (
+                                                <Card key={pegRNA.id} padding="10px" marginBottom="10px" backgroundColor="#f8f9fa">
+                                                    <Flex justifyContent="space-between" alignItems="center">
+                                                        <Text fontWeight="bold">{pegRNA.name}</Text>
+                                                        <Text color="blue">Score: {score}</Text>
+                                                    </Flex>
+                                                    <Text fontSize="12px" fontFamily="monospace" marginTop="5px">
+                                                        {pegRNA.sequence}
+                                                    </Text>
+                                                </Card>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <Text color="gray">No diverse results generated yet</Text>
+                                )}
+                            </Card>
+                            
+                            {/* OptiPrime Top Results */}
+                            <Card padding="15px">
+                                <Heading level={4} children="OptiPrime Top Results" />
+                                <Text fontSize="14px" color="gray" marginBottom="10px">
+                                    Highest scoring pegRNAs by OptiPrime algorithm
+                                </Text>
+                                {optiPrimeResults.length > 0 ? (
+                                    <div style={{ 
+                                        maxHeight: "600px", 
+                                        overflowY: "auto",
+                                        paddingRight: "10px"
+                                    }}>
+                                        {optiPrimeResults.map((pegRNA, index) => (
                                             <Card key={pegRNA.id} padding="10px" marginBottom="10px" backgroundColor="#f8f9fa">
                                                 <Flex justifyContent="space-between" alignItems="center">
                                                     <Text fontWeight="bold">{pegRNA.name}</Text>
-                                                    <Text color="blue">Score: {score}</Text>
+                                                    <Text color="green">Score: {pegRNA.score}</Text>
                                                 </Flex>
                                                 <Text fontSize="12px" fontFamily="monospace" marginTop="5px">
                                                     {pegRNA.sequence}
                                                 </Text>
                                             </Card>
-                                        );
-                                    })}
-                                    
-                                    {/* Statistics for Diverse PegRNAs */}
-                                    <Card padding="10px" marginTop="15px" backgroundColor="#e3f2fd">
-                                        <Heading level={5} children="Diverse PegRNAs Statistics" />
-                                        {(() => {
-                                            const scores = diverseResults.map(pegRNA => {
-                                                // eslint-disable-next-line no-undef
-                                                const candidate = allCandidateSequences.find(c => c.id === pegRNA.id);
-                                                return candidate ? candidate.score : null;
-                                            }).filter(score => score !== null);
-                                            
-                                            if (scores.length === 0) {
-                                                return <Text color="gray">No scores available</Text>;
-                                            }
-                                            
-                                            const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-                                            const variance = scores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / scores.length;
-                                            const stdDev = Math.sqrt(variance);
-                                            
-                                            return (
-                                                <Flex direction="column" gap="5px">
-                                                    <Text>Mean OptiPrime Score: <Text fontWeight="bold">{mean.toFixed(3)}</Text></Text>
-                                                    <Text>Standard Deviation: <Text fontWeight="bold">{stdDev.toFixed(3)}</Text></Text>
-                                                    <Text>Score Range: <Text fontWeight="bold">{Math.min(...scores).toFixed(3)} - {Math.max(...scores).toFixed(3)}</Text></Text>
-                                                </Flex>
-                                            );
-                                        })()}
-                                    </Card>
-                                </>
-                            ) : (
-                                <Text color="gray">No diverse results generated yet</Text>
-                            )}
-                        </Card>
-                        
-                        {/* OptiPrime Top Results */}
-                        <Card padding="15px">
-                            <Heading level={4} children="OptiPrime Top Results" />
-                            <Text fontSize="14px" color="gray" marginBottom="10px">
-                                Highest scoring pegRNAs by OptiPrime algorithm
-                            </Text>
-                            {optiPrimeResults.length > 0 ? (
-                                <>
-                                    {optiPrimeResults.map((pegRNA, index) => (
-                                        <Card key={pegRNA.id} padding="10px" marginBottom="10px" backgroundColor="#f8f9fa">
-                                            <Flex justifyContent="space-between" alignItems="center">
-                                                <Text fontWeight="bold">{pegRNA.name}</Text>
-                                                <Text color="green">Score: {pegRNA.score}</Text>
-                                            </Flex>
-                                            <Text fontSize="12px" fontFamily="monospace" marginTop="5px">
-                                                {pegRNA.sequence}
-                                            </Text>
-                                        </Card>
-                                    ))}
-                                    
-                                    {/* Statistics for OptiPrime Results */}
-                                    <Card padding="10px" marginTop="15px" backgroundColor="#e8f5e8">
-                                        <Heading level={5} children="OptiPrime Results Statistics" />
-                                        {(() => {
-                                            const scores = optiPrimeResults.map(pegRNA => parseFloat(pegRNA.score));
-                                            
-                                            if (scores.length === 0) {
-                                                return <Text color="gray">No scores available</Text>;
-                                            }
-                                            
-                                            const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-                                            const variance = scores.reduce((sum, score) => sum + Math.pow(score - mean, 2), 0) / scores.length;
-                                            const stdDev = Math.sqrt(variance);
-                                            
-                                            return (
-                                                <Flex direction="column" gap="5px">
-                                                    <Text>Mean OptiPrime Score: <Text fontWeight="bold">{mean.toFixed(3)}</Text></Text>
-                                                    <Text>Standard Deviation: <Text fontWeight="bold">{stdDev.toFixed(3)}</Text></Text>
-                                                    <Text>Score Range: <Text fontWeight="bold">{Math.min(...scores).toFixed(3)} - {Math.max(...scores).toFixed(3)}</Text></Text>
-                                                </Flex>
-                                            );
-                                        })()}
-                                    </Card>
-                                </>
-                            ) : (
-                                <Text color="gray">No OptiPrime results generated yet</Text>
-                            )}
-                        </Card>
-                    </Grid>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <Text color="gray">No OptiPrime results generated yet</Text>
+                                )}
+                            </Card>
+                        </Grid>
+                    </>
                 )}
                 
-                {diverseResults.length === 0 && optiPrimeResults.length === 0 && Object.keys(summary).length > 0 && (
+                {/* Show message to press Generate Comparison button before first generation */}
+                {!hasGeneratedComparison && Object.keys(summary).length > 0 && (
                     <Text color="gray" textAlign="center" marginTop="20px">
                         Click "Generate Comparison" to see the results
                     </Text>
                 )}
                 
-                {/* Debug Display Section */}
-                {showDebug && (
-                    <Card padding="20px" marginTop="20px" backgroundColor="#f5f5f5">
-                        <Heading level={4} children="Debug Information" />
-                        <Grid templateColumns="1fr 1fr" gap="20px">
-                            <Card padding="15px">
-                                <Heading level={5} children="Summary Data" />
-                                <Text fontSize="12px" fontFamily="monospace" whiteSpace="pre-wrap">
-                                    {JSON.stringify(summary, null, 2)}
-                                </Text>
-                            </Card>
-                            <Card padding="15px">
-                                <Heading level={5} children="SubJobIDs" />
-                                <Text fontSize="12px" fontFamily="monospace" whiteSpace="pre-wrap">
-                                    {JSON.stringify(jobData.subJobIDs, null, 2)}
-                                </Text>
-                            </Card>
-                        </Grid>
-                        <Card padding="15px" marginTop="15px">
-                            <Heading level={5} children="SubJobData (First 3 entries)" />
-                            <Text fontSize="12px" fontFamily="monospace" whiteSpace="pre-wrap">
-                                {JSON.stringify(jobData.subJobData.slice(0, 3), null, 2)}
-                            </Text>
-                        </Card>
-                        <Card padding="15px" marginTop="15px">
-                            <Heading level={5} children="Matching Analysis" />
-                            <Text>
-                                Summary keys: {Object.keys(summary).length}
-                            </Text>
-                            <Text>
-                                SubJobIDs: {jobData.subJobIDs.length}
-                            </Text>
-                            <Text>
-                                Matching IDs: {Object.keys(summary).filter(id => jobData.subJobIDs.includes(id)).length}
-                            </Text>
-                            <Text>
-                                Matching IDs: {Object.keys(summary).filter(id => jobData.subJobIDs.includes(id)).join(', ')}
-                            </Text>
-                        </Card>
-                    </Card>
+                {/* Show message if no results after generation */}
+                {hasGeneratedComparison && diverseResults.length === 0 && optiPrimeResults.length === 0 && Object.keys(summary).length > 0 && (
+                    <Text color="gray" textAlign="center" marginTop="20px">
+                        No results generated. Please check the console for details.
+                    </Text>
                 )}
             </Card>
             
