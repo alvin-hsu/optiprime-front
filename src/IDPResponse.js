@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Cookies from "js-cookie";
 import { decodeToken } from "react-jwt";
+import { trackEvent } from "./analytics";
 
 /*
  * Handles google OAuth2 response - stores the access token in a cookie and redirects to page in 'state' parameter
@@ -52,6 +53,7 @@ const IDPResponse = ({ updateUserData }) => {
                                       sameSite: "Strict",
                                       expires: expTime });
         }
+        trackEvent("login");
         navigate(redirectUrl, { replace: true });
         updateUserData();
     }, [navigate, updateUserData]);

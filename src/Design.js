@@ -45,6 +45,7 @@ import {
 import ClinvarAutocomplete from "./ClinvarAutocomplete";
 import { EditableSeqViz, SeqVizWithCDS, editHighlights } from "./ModdedSeqViz";
 import { codonTableForward, aminoAcidColors, darkAminoAcidColors } from "./Codons";
+import { trackEvent } from "./analytics";
 
 const _CONTEXT_LEN = 110;
 
@@ -1055,6 +1056,11 @@ const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
             }
         })
         .then(body => {
+            trackEvent("design_submit", {
+                organism: state.organism || "unknown",
+                manual: Boolean(state.manual),
+                num_subjobs: minState.subJobs.length
+            });
             updateTokens();
             navigate(`/jobs/${body.jobID}`);
         })

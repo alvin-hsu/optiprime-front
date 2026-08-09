@@ -29,6 +29,7 @@ import Scratch from "./Scratch";
 import TOS from "./TOS";
 
 import { fetchAuth, verifyRSASignature } from "./Utils";
+import { trackPageView, setAnalyticsUser } from "./analytics";
 
 
 // Is this the local development server?
@@ -323,6 +324,16 @@ const App = () => {
         const handle = setTimeout(() => setUserData({}), msLeft);
         return () => clearTimeout(handle);
     }, [userData.exp]);
+
+    // GA4 page_view on every route change (fires for anonymous + logged-in visitors).
+    useEffect(() => {
+        trackPageView(location.pathname + location.search);
+    }, [location.pathname, location.search]);
+
+    // Attach the Cognito user id to analytics once logged in.
+    useEffect(() => {
+        setAnalyticsUser(userData.sub);
+    }, [userData.sub]);
 
     return (
         <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>

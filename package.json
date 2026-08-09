@@ -19,6 +19,7 @@
     "react-csv-reader": "^4.0.0",
     "react-dom": "^18.2.0",
     "react-error-boundary": "^6.0.0",
+    "react-ga4": "^3.0.1",
     "react-google-button": "^0.8.0",
     "react-icons": "^5.4.0",
     "react-jwt": "^1.2.1",
