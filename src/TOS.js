@@ -36,18 +36,17 @@ Free for students, postdocs, faculty, and staff at academic, nonprofit, or U.S. 
 **Attribution:** When publishing results, please cite the OptiPrime paper:
 \`\`\`
 @article{optiprime,
-    title     = {Mechanistic machine learning enables interpretable and generalizable prediction of
-                 prime editing outcomes},
+    title     = {Mechanistic machine learning for prediction of prime editing outcomes},
     author    = {Hsu, Alvin and Chen, Peter J. and Li, Angus H. and Hemez, Colin F. and Gao, Xin D.
                  and Terrey, Markus and Nelson, Charlie and Selvam, Vijay and Cristian, Ana and
-                 McElroy, Amber N. and Mahadeshwar, Gandhar K. and Pandey, Smriti and Barsdale,
-                 Zachary and Chen, Paul Z. and Sousa, Alexander A. and Sakai, Holt A. and
-                 Silverstein, Rachel A. and Morad, Ilias and Krueger, Ryan K. and Shen, Max W. and
-                 Kleinstiver, Benjamin P. and Lutz, Cathleen M. and Blazar, Bruce R. and Osborn,
-                 Mark J. and Liu, David R.},
+                 McElroy, Amber N. and Steinbeck, Benjamin J. and Mahadeshwar, Gandhar K. and
+                 Pandey, Smriti and Barsdale, Zachary and Chen, Paul Z. and Sousa, Alexander A. and
+                 Sakai, Holt A. and Silverstein, Rachel A. and Morad, Ilias and Krueger, Ryan K. and
+                 Shen, Max W. and Kleinstiver, Benjamin P. and Lutz, Cathleen M. and Tolar, Jakub
+                 and Blazar, Bruce R. and Osborn, Mark J. and Liu, David R.},
     author+an = {1=jointfirst;2=jointfirst;3=jointfirst},
-    year      = 2025,
-    journal   = {Manuscript in review},
+    year      = 2026,
+    journal   = {Nature Biotechnology},
     type      = {Journal Article}
 }
 \`\`\`
@@ -59,6 +58,8 @@ You must include a notice that any Code, Outputs, Developments, and Generated IP
 - You are prohibited from asserting infringement of Generated IP against Institutions or their respective licensees. Asserting such Generated IP terminates this license automatically and the Termination clause applies.
 
 **Safety & Compliance:** The Code and Outputs are **research tools only** - they are not validated for clinical use or professional advice. You must comply with all applicable laws and regulations.
+
+**Logging & Enforcement:** We log OptiPrime queries and associated metadata. We use these records to operate and secure the Code, to monitor compliance with these License Terms, and to establish and enforce Institutions' rights.
 
 **Termination:** Your rights terminate automatically (retroactively to first use of the Code or Outputs) if you breach these License Terms. You must then stop use and delete local copies where feasible.
 
