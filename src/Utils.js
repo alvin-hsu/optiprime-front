@@ -745,24 +745,33 @@ export const findProtosDirection = (uSeq, eSeq, direction, pamdaData, searchDist
     const preHom = uSeq.substring(0, preLen);
     const postHom = uSeq.substring(uSeq.length - postLen);
     const uLen = minU.length;
-    const search = (preHom.substring(preLen - searchDist - 21) +
+    const searchStart = Math.max(0, preLen - searchDist - 21);
+    const search = (preHom.substring(searchStart) +
         minU.substring(0, Math.min(uLen, 7)) +
         postHom.substring(0, Math.max(0, 7 - Math.min(uLen, 7))));
     const idxs = [...search.matchAll(PAM_RE)].map(x => x.index);
     return idxs.map(x => {
-        const idx = x + (preLen - searchDist - 21);  // Index of match start
+        const idx = x + searchStart;  // Index of match start
         const nickDist = preHom.length - (idx + 21) + 1;
         const start20 = idx + 4;
         const end20 = start20 + 20;
         const proto30 = uSeq.substring(idx, idx + 30);
+        // Near the 3' end substring() returns a short window; the scoring API
+        // expects a full 30-mer and would score the truncated one as complete.
+        if (proto30.length !== 30) { return null; }
         const unedited = uSeq.substring(start20 - 4, start20 + 71 + uDelta);
         const edited =   eSeq.substring(start20 - 4, start20 + 71 + eDelta);
         const offset = edited.length - minEdit(unedited, edited).postLen;
         const pam = uSeq.substring(idx + 24, idx + 28);
-        const [pamVar, pamScore] = pamdaData[pam]
+        const pamEntry = pamdaData[pam];
+        if (pamEntry === undefined) {
+            console.error(`[protos] PAM "${pam}" at ${idx + 24} not in HT-PAMDA data`);
+            return null;
+        }
+        const [pamVar, pamScore] = pamEntry;
         return { direction, start20, end20, proto30, unedited, edited,
                  offset, pam, pamVar, pamScore, nickDist };
-    });
+    }).filter(x => x !== null);
 };
 
 export const scaleProtoScore = (score, pamda) => {

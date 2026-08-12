@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from "react";
+import React, {useEffect, useMemo, useRef, useState} from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
     Alert,
@@ -714,6 +714,19 @@ const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
     const eSeq = editedData.seq;
     const uSeqR = revcomp(uSeq);
     const eSeqR = revcomp(eSeq);
+    // Each strand's protospacer search needs searchDist (18) + 21 nt of homology
+    // 5' of the edit; below that the PAM window is truncated and protospacers are
+    // missed. The two strands are checked separately because minEdit resolves an
+    // indel's position differently on each.
+    const shortFlank = useMemo(() => {
+        const MIN_FLANK = 18 + 21;
+        const { minU, minE, preLen } = minEdit(uSeq, eSeq);
+        // With no edit, preLen is the whole sequence and "flank" is meaningless.
+        if (minU.length === 0 && minE.length === 0) { return null; }
+        const rFlank = minEdit(uSeqR, eSeqR).preLen;
+        const worst = Math.min(preLen, rFlank);
+        return worst < MIN_FLANK ? { worst, min: MIN_FLANK } : null;
+    }, [uSeq, eSeq, uSeqR, eSeqR]);
     // Protospacer search and selection
     const [protos, setProtos] = useState([]);
     const [selected, setSelected] = useState({});
@@ -1302,6 +1315,12 @@ const PreviewPage = ({ state, setState, onBack, updateTokens }) => {
                 })()}
             </Card>
             <Card columnStart="1" columnEnd="-1" height="auto">
+                {shortFlank &&
+                <Alert isDismissible={false} hasIcon={true} variation="warning">
+                    Only {shortFlank.worst} nt of sequence flank the edit on one side.
+                    At least {shortFlank.min} nt (ideally 50 nt) are needed on each
+                    side to find every protospacer; some may be missing below.
+                </Alert>}
                 {info &&
                 <Alert isDismissible={false} hasIcon={true} variation="info">
                     {info}
