@@ -451,7 +451,7 @@ const formatSyntheticEpegRNA = (spacer, rtt, pbs) => {
 
 // Build all three construction representations for a single pegRNA.
 const buildConstructions = ({ spacer, rtt, pbs }) => {
-    const ext = (rtt + pbs + TEVOPREQ1).toUpperCase();
+    const ext = (rtt + pbs).toUpperCase();
     const spc = spacer.toUpperCase();
     const ggPart1Top = GG_PART1_TOP_5 + spc + GG_PART1_TOP_3;
     const ggPart1Bot = GG_PART1_BOT_5 + revcomp(spc);
@@ -667,7 +667,7 @@ const ConstructionTabs = ({ results }) => {
         { key: "score",      label: "OptiPrime score" },
         { key: "ggPart1Top", label: "Part 1 top (spacer)" },
         { key: "ggPart1Bot", label: "Part 1 bottom" },
-        { key: "ggPart3Top", label: "Part 3 top (3' extension)" },
+        { key: "ggPart3Top", label: "Part 3 top (RTT+PBS)" },
         { key: "ggPart3Bot", label: "Part 3 bottom" }
     ];
     const gibsonColumns = [
@@ -707,8 +707,10 @@ const ConstructionTabs = ({ results }) => {
                     <Flex direction="column" gap="10px" padding="10px 0">
                         <Text fontSize="13px">
                             Order Part 1 and Part 3 oligo pairs unmodified; order Part 2
-                            oligos 5'-phosphorylated (Part 2 is fixed for the standard SpCas9
-                            scaffold and shared across all epegRNAs). Anneal each pair, then
+                            oligos 5'-phosphorylated (Part 2 is fixed for the F+E SpCas9
+                            scaffold and shared across all epegRNAs). Part 3 carries the
+                            RTT/PBS extension only — the tevopreq1 motif is already in the
+                            acceptor backbone. Anneal each pair, then
                             Golden Gate assemble (BsaI-HFv2 + T4 ligase) into the{" "}
                             <a href="https://www.addgene.org/174038/" target="_blank" rel="noreferrer">
                                 pU6-tevopreq1-GG-acceptor backbone
